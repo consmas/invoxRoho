@@ -1,0 +1,2 @@
+programmeCode,buyerRegistrationNumber,supplierRegistrationNumber,buyerTin,supplierTin,invoiceNumber,externalReference,amount,currency,issueDate,dueDate,purchaseOrderNumber,grnNumber,taxAmount,description,buyerApproved,buyerApprovalReference
+RF-DEMO,ANCHOR-001,SUPPLIER-001,,,INV-1001,ERP-INV-1001,15000,GHS,2026-01-15,2026-03-15,PO-1001,GRN-1001,1875,Approved payable,true,APP-1001

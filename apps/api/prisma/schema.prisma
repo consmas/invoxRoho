@@ -1,0 +1,1401 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum CounterpartyType {
+  ANCHOR
+  SUPPLIER
+  FUNDER
+  INVESTOR
+}
+
+enum OnboardingStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum RiskRating {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum KycTier {
+  SIMPLIFIED
+  STANDARD
+  ENHANCED
+}
+
+enum VerificationStatus {
+  NOT_STARTED
+  PENDING
+  VERIFIED
+  FAILED
+  MANUAL_REVIEW
+}
+
+enum ScreeningStatus {
+  NOT_SCREENED
+  CLEAR
+  POSSIBLE_MATCH
+  CONFIRMED_MATCH
+}
+
+enum DocumentStatus {
+  REQUIRED
+  RECEIVED
+  ACTIVE
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+  EXPIRED
+  WAIVED
+  DELETED
+}
+
+enum ProgrammeStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum ProductType {
+  REVERSE_FACTORING
+  DYNAMIC_DISCOUNTING
+  RECEIVABLES_FINANCE
+  FACTORING
+  INVOICE_DISCOUNTING
+  DISTRIBUTOR_FINANCE
+  DEEP_TIER_FINANCE
+  RECEIVABLES_PURCHASE
+}
+
+enum ProgrammeMode {
+  LIVE
+  SANDBOX
+}
+
+enum DayCountConvention {
+  ACT_360
+  ACT_365
+  THIRTY_360
+}
+
+enum DiscountMethod {
+  STRAIGHT_DISCOUNT
+  TRUE_DISCOUNT
+}
+
+enum InvoiceStatus {
+  RECEIVED
+  VALIDATED
+  APPROVED
+  FINANCEABLE
+  OFFERED
+  FINANCED
+  SETTLED
+  DISPUTED
+  CANCELLED
+}
+
+enum FinancingStatus {
+  OFFERED
+  ACCEPTED
+  FUNDED
+  DISBURSED
+  MATURED
+  COLLECTED
+  CLOSED
+  DEFAULTED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  INITIATED
+  SENT
+  CONFIRMED
+  FAILED
+  RETURNED
+}
+
+enum LedgerEntryType {
+  DEBIT
+  CREDIT
+}
+
+enum LimitScope {
+  FUNDER
+  PROGRAMME
+  ANCHOR
+  SUPPLIER
+  SECTOR
+  COUNTRY
+  TENOR
+  SINGLE_NAME
+}
+
+enum DecisionOutcome {
+  APPROVED
+  DECLINED
+  REFERRED
+}
+
+enum ObligationStatus {
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  PAST_DUE
+  DEFAULTED
+  RESTRUCTURED
+  WRITTEN_OFF
+}
+
+enum ReconciliationStatus {
+  UNMATCHED
+  PARTIALLY_MATCHED
+  MATCHED
+  MISMATCHED
+  INVESTIGATING
+  RESOLVED
+}
+
+enum WorkflowCaseStatus {
+  OPEN
+  IN_PROGRESS
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CLOSED
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  IN_APP
+  WHATSAPP
+  MOBILE_MONEY
+  WEBHOOK
+}
+
+enum NotificationStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+  DELIVERED
+  CANCELLED
+  RETRYING
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  FAILED_LOGIN
+  APPROVE
+  REJECT
+  SUBMIT
+  CALCULATE
+  ALLOCATE
+  DISBURSE
+  COLLECT
+}
+
+model User {
+  id             String             @id @default(uuid())
+  email          String             @unique
+  passwordHash   String?
+  firstName      String?
+  lastName       String?
+  phone          String?
+  status         UserStatus         @default(INVITED)
+  lastLoginAt    DateTime?
+  passwordChangedAt DateTime?
+  invitedAt      DateTime?
+  inviteAcceptedAt DateTime?
+  roles          UserRole[]
+  counterparties CounterpartyUser[]
+  auditLogs      AuditLog[]
+  reviewedComplianceChecks ComplianceCheck[] @relation("ComplianceCheckReviewedBy")
+  uploadedDocuments DocumentRecord[] @relation("DocumentUploadedBy")
+  verifiedDocuments DocumentRecord[] @relation("DocumentVerifiedBy")
+  invoiceImportBatches InvoiceImportBatch[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  description String?
+  users       UserRole[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  key         String           @unique
+  description String?
+  roles       RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String
+  roleId    String
+  user      User     @relation(fields: [userId], references: [id])
+  role      Role     @relation(fields: [roleId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, roleId])
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  createdAt    DateTime   @default(now())
+
+  @@unique([roleId, permissionId])
+}
+
+model Counterparty {
+  id                   String                 @id @default(uuid())
+  type                 CounterpartyType
+  legalName            String
+  tradingName          String?
+  registrationNumber   String?
+  tin                  String?
+  country              String                 @default("GH")
+  address              String?
+  industry             String?
+  contactEmail         String?
+  contactPhone         String?
+  website              String?
+  ownershipSummary     String?
+  directorsSummary     String?
+  onboardingStatus     OnboardingStatus       @default(DRAFT)
+  onboardingProgress   Int                    @default(0)
+  riskRating           RiskRating?
+  kycTier              KycTier?
+  kybStatus            VerificationStatus     @default(NOT_STARTED)
+  screeningStatus      String                 @default("NOT_STARTED")
+  sanctionsStatus      String                 @default("NOT_STARTED")
+  pepStatus            String                 @default("NOT_STARTED")
+  adverseMediaStatus   String                 @default("NOT_STARTED")
+  identityVerificationStatus VerificationStatus @default(NOT_STARTED)
+  registryVerificationStatus VerificationStatus @default(NOT_STARTED)
+  creditBureauStatus   VerificationStatus     @default(NOT_STARTED)
+  sanctionsScreeningStatus ScreeningStatus     @default(NOT_SCREENED)
+  pepScreeningStatus   ScreeningStatus        @default(NOT_SCREENED)
+  adverseMediaScreeningStatus ScreeningStatus  @default(NOT_SCREENED)
+  lastKybCheckAt       DateTime?
+  lastScreenedAt       DateTime?
+  lastScreeningAt      DateTime?
+  nextKybReviewAt      DateTime?
+  nextScreeningAt      DateTime?
+  complianceReviewStatus String?
+  complianceNotes      String?
+  nextReviewDate       DateTime?
+  consentAcceptedAt    DateTime?
+  dataProcessingAgreementAcceptedAt DateTime?
+  submittedAt          DateTime?
+  approvedAt           DateTime?
+  rejectedAt           DateTime?
+  onboardingDecisionReason String?
+  users                CounterpartyUser[]
+  bankAccounts         BankAccount[]
+  uboRecords           UboRecord[]
+  directors            DirectorRecord[]
+  documents            CounterpartyDocument[]
+  consentRecords       ConsentRecord[]
+  programmesAsAnchor   Programme[]            @relation("ProgrammeAnchor")
+  programmeParticipants ProgrammeParticipant[]
+  invoicesAsBuyer      Invoice[]              @relation("InvoiceBuyer")
+  invoicesAsSupplier   Invoice[]              @relation("InvoiceSupplier")
+  fundingAllocations   FundingAllocation[]
+  payments             Payment[]
+  limits               LimitRecord[]
+  exposureSnapshots    ExposureSnapshot[]
+  funderProfile        FunderProfile?
+  investorRecords      InvestorRecord[]
+  documentsRepository  DocumentRecord[]
+  workflowCases        WorkflowCase[]
+  invoiceImportBatches InvoiceImportBatch[]
+  notificationLogs     NotificationLog[]
+  complianceChecks     ComplianceCheck[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+}
+
+model CounterpartyUser {
+  id             String       @id @default(uuid())
+  counterpartyId String
+  userId         String
+  counterparty   Counterparty @relation(fields: [counterpartyId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([counterpartyId, userId])
+}
+
+model BankAccount {
+  id             String       @id @default(uuid())
+  counterpartyId String
+  bankName       String
+  accountName    String
+  accountNumber  String
+  branch         String?
+  currency       String       @default("GHS")
+  paymentInstruction String?
+  verificationStatus VerificationStatus @default(NOT_STARTED)
+  isVerified     Boolean      @default(false)
+  isPrimary      Boolean      @default(false)
+  verifiedAt     DateTime?
+  counterparty   Counterparty @relation(fields: [counterpartyId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model UboRecord {
+  id                  String       @id @default(uuid())
+  counterpartyId      String
+  fullName            String
+  nationality         String?
+  dateOfBirth         DateTime?
+  address             String?
+  idType              String?
+  idNumber            String?
+  ownershipPercentage Decimal?
+  kycStatus           String       @default("NOT_STARTED")
+  screeningStatus     ScreeningStatus @default(NOT_SCREENED)
+  sanctionsStatus     String       @default("NOT_STARTED")
+  pepStatus           String       @default("NOT_STARTED")
+  adverseMediaStatus  String       @default("NOT_STARTED")
+  lastKycCheckAt      DateTime?
+  lastScreeningAt     DateTime?
+  nextKycReviewAt     DateTime?
+  nextScreeningAt     DateTime?
+  complianceReviewStatus String?
+  complianceNotes     String?
+  counterparty        Counterparty @relation(fields: [counterpartyId], references: [id])
+  complianceChecks    ComplianceCheck[]
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+}
+
+model DirectorRecord {
+  id             String       @id @default(uuid())
+  counterpartyId String
+  fullName       String
+  nationality    String?
+  dateOfBirth    DateTime?
+  idType         String?
+  idNumber       String?
+  roleTitle      String?
+  screeningStatus ScreeningStatus @default(NOT_SCREENED)
+  counterparty   Counterparty @relation(fields: [counterpartyId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model CounterpartyDocument {
+  id             String       @id @default(uuid())
+  counterpartyId String
+  documentType   String
+  fileName       String?
+  status         DocumentStatus @default(REQUIRED)
+  issuedAt       DateTime?
+  expiresAt      DateTime?
+  verifiedAt     DateTime?
+  notes          String?
+  counterparty   Counterparty @relation(fields: [counterpartyId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model ConsentRecord {
+  id             String       @id @default(uuid())
+  counterpartyId String
+  consentType    String
+  acceptedBy     String?
+  acceptedAt     DateTime     @default(now())
+  ipAddress      String?
+  userAgent      String?
+  counterparty   Counterparty @relation(fields: [counterpartyId], references: [id])
+  createdAt      DateTime     @default(now())
+}
+
+model ComplianceCheck {
+  id                 String       @id @default(uuid())
+  counterpartyId     String?
+  uboRecordId        String?
+  checkType          String
+  providerType       String
+  providerKey        String
+  providerReference  String?
+  status             String
+  normalizedResult   String
+  reviewRequired     Boolean      @default(false)
+  riskLevel          String?
+  reason             String?
+  requestJson        Json?
+  responseJson       Json?
+  checkedAt          DateTime     @default(now())
+  expiresAt          DateTime?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  reviewDecision     String?
+  reviewNotes        String?
+  counterparty       Counterparty? @relation(fields: [counterpartyId], references: [id])
+  uboRecord          UboRecord?    @relation(fields: [uboRecordId], references: [id])
+  reviewedBy         User?         @relation("ComplianceCheckReviewedBy", fields: [reviewedById], references: [id])
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([counterpartyId, checkType])
+  @@index([uboRecordId, checkType])
+  @@index([status, checkedAt])
+  @@index([normalizedResult])
+  @@index([reviewRequired])
+}
+
+model Programme {
+  id                   String                 @id @default(uuid())
+  name                 String
+  code                 String                 @unique
+  productType          ProductType            @default(REVERSE_FACTORING)
+  mode                 ProgrammeMode          @default(LIVE)
+  anchorId             String
+  currency             String                 @default("GHS")
+  status               ProgrammeStatus        @default(DRAFT)
+  version              Int                    @default(1)
+  effectiveFrom        DateTime?
+  effectiveTo          DateTime?
+  publishedAt          DateTime?
+  expiresAt            DateTime?
+  eligibilityCounterpartyStatus OnboardingStatus @default(APPROVED)
+  minimumInvoiceAgeDays Int?
+  maximumInvoiceAgeDays Int?
+  maxTenorDays         Int?
+  minimumInvoiceAmount Decimal?
+  maximumInvoiceAmount Decimal?
+  excludedCounterpartyIds Json?
+  programmeLimit       Decimal?
+  anchorLimit          Decimal?
+  supplierLimit        Decimal?
+  funderLimit          Decimal?
+  concentrationCapPercent Decimal?
+  referenceRateSource  String?
+  referenceRate        Decimal?
+  funderSpread         Decimal?
+  annualDiscountRate   Decimal
+  dayCountConvention   DayCountConvention     @default(ACT_360)
+  discountMethod       DiscountMethod         @default(STRAIGHT_DISCOUNT)
+  platformFeeFlat      Decimal                @default(0)
+  platformFeePercent   Decimal                @default(0)
+  arrangementFeeFlat   Decimal                @default(0)
+  servicingFeePercent  Decimal                @default(0)
+  approvalWorkflow     Json?
+  requiredDocuments    Json?
+  eSignRequired        Boolean                @default(false)
+  workflowSlaHours     Int?
+  eligibilityRules     Json?
+  limitRules           Json?
+  pricingRules         Json?
+  sandboxAssumptions   Json?
+  whiteLabelName       String?
+  brandPrimaryColor    String?
+  brandLogoUrl         String?
+  termsUrl             String?
+  configurationNotes   String?
+  anchor               Counterparty           @relation("ProgrammeAnchor", fields: [anchorId], references: [id])
+  participants         ProgrammeParticipant[]
+  invoices             Invoice[]
+  financingTransactions FinancingTransaction[]
+  limits               LimitRecord[]
+  exposureSnapshots    ExposureSnapshot[]
+  maturityObligations  MaturityObligation[]
+  documentsRepository  DocumentRecord[]
+  workflowCases        WorkflowCase[]
+  invoiceImportBatches InvoiceImportBatch[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+}
+
+model ProgrammeParticipant {
+  id              String           @id @default(uuid())
+  programmeId     String
+  counterpartyId  String
+  participantType CounterpartyType
+  isActive        Boolean          @default(true)
+  programme       Programme        @relation(fields: [programmeId], references: [id])
+  counterparty    Counterparty     @relation(fields: [counterpartyId], references: [id])
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([programmeId, counterpartyId, participantType])
+}
+
+model Invoice {
+  id                    String                 @id @default(uuid())
+  programmeId           String
+  buyerId               String
+  supplierId            String
+  invoiceNumber         String
+  externalReference     String?
+  ingestionChannel      String                 @default("MANUAL")
+  sourceSystem          String?
+  sourceType            String?
+  importBatchId         String?
+  buyerApprovalReference String?
+  buyerApprovalSource   String?
+  buyerApprovalImportedAt DateTime?
+  einvoicingStatus      String                 @default("NOT_CHECKED")
+  einvoicingReference   String?
+  einvoicingCheckedAt   DateTime?
+  einvoicingResponseJson Json?
+  purchaseOrderNumber   String?
+  goodsReceivedNote     String?
+  currency              String                 @default("GHS")
+  amount                Decimal
+  taxAmount             Decimal                @default(0)
+  creditNoteAmount      Decimal                @default(0)
+  paidAmount            Decimal                @default(0)
+  disputedAmount        Decimal                @default(0)
+  financeableAmount     Decimal?
+  issueDate             DateTime
+  dueDate               DateTime
+  status                InvoiceStatus          @default(RECEIVED)
+  buyerApprovedAt       DateTime?
+  approvedByUserId      String?
+  validationStatus      String                 @default("PENDING")
+  validationErrors      Json?
+  duplicateCheckStatus  String                 @default("PENDING")
+  fraudCheckStatus      String                 @default("PENDING")
+  provenanceHash        String?
+  attachmentMetadata    Json?
+  description           String?
+  fiscalReference       String?
+  cancellationReason    String?
+  cancelledAt           DateTime?
+  programme             Programme              @relation(fields: [programmeId], references: [id])
+  buyer                 Counterparty            @relation("InvoiceBuyer", fields: [buyerId], references: [id])
+  supplier              Counterparty            @relation("InvoiceSupplier", fields: [supplierId], references: [id])
+  importBatch           InvoiceImportBatch?     @relation(fields: [importBatchId], references: [id])
+  financingTransaction  FinancingTransaction?
+  provenanceRecords     InvoiceProvenanceRecord[]
+  documentsRepository   DocumentRecord[]
+  importRowsCreated     InvoiceImportRow[]      @relation("InvoiceImportRowCreatedInvoice")
+  importRowsDuplicates  InvoiceImportRow[]      @relation("InvoiceImportRowDuplicateInvoice")
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@unique([buyerId, supplierId, invoiceNumber])
+  @@index([importBatchId])
+  @@index([externalReference])
+  @@index([einvoicingStatus])
+}
+
+model InvoiceImportBatch {
+  id                 String             @id @default(uuid())
+  sourceType         String
+  sourceReference    String?
+  programmeId        String?
+  anchorId           String?
+  uploadedDocumentId String?
+  status             String             @default("PENDING")
+  totalRows          Int                @default(0)
+  validRows          Int                @default(0)
+  invalidRows        Int                @default(0)
+  duplicateRows      Int                @default(0)
+  importedRows       Int                @default(0)
+  failedRows         Int                @default(0)
+  startedAt          DateTime?
+  completedAt        DateTime?
+  uploadedById       String?
+  errorSummary       String?
+  programme          Programme?         @relation(fields: [programmeId], references: [id])
+  anchor             Counterparty?      @relation(fields: [anchorId], references: [id])
+  uploadedDocument   DocumentRecord?    @relation(fields: [uploadedDocumentId], references: [id])
+  uploadedBy         User?              @relation(fields: [uploadedById], references: [id])
+  rows               InvoiceImportRow[]
+  invoices           Invoice[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([sourceType, status])
+  @@index([programmeId])
+  @@index([anchorId])
+  @@index([uploadedDocumentId])
+  @@index([uploadedById])
+  @@index([createdAt])
+}
+
+model InvoiceImportRow {
+  id                   String              @id @default(uuid())
+  batchId              String
+  rowNumber            Int
+  rawJson              Json
+  normalizedJson       Json?
+  status               String              @default("PENDING")
+  validationErrors     Json?
+  duplicateOfInvoiceId String?
+  createdInvoiceId     String?
+  batch                InvoiceImportBatch  @relation(fields: [batchId], references: [id])
+  duplicateOfInvoice   Invoice?            @relation("InvoiceImportRowDuplicateInvoice", fields: [duplicateOfInvoiceId], references: [id])
+  createdInvoice       Invoice?            @relation("InvoiceImportRowCreatedInvoice", fields: [createdInvoiceId], references: [id])
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@unique([batchId, rowNumber])
+  @@index([batchId, status])
+  @@index([duplicateOfInvoiceId])
+  @@index([createdInvoiceId])
+}
+
+model FinancingTransaction {
+  id                 String              @id @default(uuid())
+  invoiceId          String              @unique
+  offerReference     String?             @unique
+  programmeId        String
+  supplierId         String
+  buyerId            String
+  invoiceAmount      Decimal
+  annualRate         Decimal
+  referenceRate      Decimal?
+  spreadRate         Decimal?
+  daysAccelerated    Int
+  discountAmount     Decimal
+  platformFee        Decimal
+  arrangementFee     Decimal             @default(0)
+  servicingFee       Decimal             @default(0)
+  netProceeds        Decimal
+  buyerObligationAmount Decimal?
+  funderSettlementAmount Decimal?
+  maturityDate       DateTime
+  settlementDate     DateTime?
+  offerExpiresAt     DateTime?
+  status             FinancingStatus     @default(OFFERED)
+  autoAccepted       Boolean             @default(false)
+  discountBreakdown  Json?
+  feeBreakdown       Json?
+  allocationRule     String?
+  assignmentReference String?
+  trueSaleStatus     String              @default("PENDING")
+  recourseAmount     Decimal             @default(0)
+  adjustmentAmount   Decimal             @default(0)
+  cancellationReason String?
+  acceptedAt         DateTime?
+  fundedAt           DateTime?
+  disbursedAt        DateTime?
+  collectedAt        DateTime?
+  invoice            Invoice             @relation(fields: [invoiceId], references: [id])
+  programme          Programme           @relation(fields: [programmeId], references: [id])
+  fundingAllocations FundingAllocation[]
+  payments           Payment[]
+  ledgerEntries      LedgerEntry[]
+  maturityObligations MaturityObligation[]
+  documentsRepository DocumentRecord[]
+  workflowCases       WorkflowCase[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+}
+
+model FundingAllocation {
+  id                     String                @id @default(uuid())
+  financingTransactionId String
+  funderId               String
+  allocatedAmount        Decimal
+  allocationPercent      Decimal
+  expectedYield          Decimal?
+  financingTransaction   FinancingTransaction @relation(fields: [financingTransactionId], references: [id])
+  funder                 Counterparty          @relation(fields: [funderId], references: [id])
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+}
+
+model Payment {
+  id                     String                @id @default(uuid())
+  financingTransactionId String?
+  counterpartyId         String?
+  direction              String
+  rail                   String?
+  currency               String                @default("GHS")
+  amount                 Decimal
+  reference              String?
+  status                 PaymentStatus         @default(INITIATED)
+  valueDate              DateTime?
+  confirmedAt            DateTime?
+  provider               String?
+  providerReference      String?
+  externalTransactionId  String?
+  idempotencyKey         String?               @unique
+  webhookReference       String?
+  providerStatus         String?
+  providerResponseJson   Json?
+  initiatedById          String?
+  verifiedById           String?
+  approvedById           String?
+  initiatedAt            DateTime?
+  verifiedAt             DateTime?
+  approvedAt             DateTime?
+  webhookReceivedAt      DateTime?
+  lastProviderCheckAt    DateTime?
+  failureReason          String?
+  reversalReason         String?
+  metadata               Json?
+  financingTransaction   FinancingTransaction? @relation(fields: [financingTransactionId], references: [id])
+  counterparty           Counterparty?         @relation(fields: [counterpartyId], references: [id])
+  applications           PaymentApplication[]
+  reconciliationItems    ReconciliationItem[]
+  ledgerEntries          LedgerEntry[]
+  webhookEvents          PaymentWebhookEvent[]
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  @@index([financingTransactionId, direction, status])
+  @@index([counterpartyId, status])
+  @@index([reference])
+  @@index([providerReference])
+  @@index([provider, providerStatus])
+}
+
+model PaymentWebhookEvent {
+  id                String   @id @default(uuid())
+  provider          String
+  eventType         String
+  eventReference    String   @unique
+  paymentId         String?
+  providerReference String?
+  payloadJson       Json
+  signatureValid    Boolean
+  processed         Boolean  @default(false)
+  processedAt       DateTime?
+  processingError   String?
+  receivedAt        DateTime @default(now())
+  payment           Payment? @relation(fields: [paymentId], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([provider, eventType])
+  @@index([paymentId])
+  @@index([providerReference])
+  @@index([processed, receivedAt])
+}
+
+model LedgerAccount {
+  id            String        @id @default(uuid())
+  code          String        @unique
+  name          String
+  currency      String        @default("GHS")
+  ledgerEntries LedgerEntry[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model ProviderWebhookEvent {
+  id                   String   @id @default(uuid())
+  providerType         String
+  providerKey          String
+  eventType            String
+  eventReference       String   @unique
+  signatureValid       Boolean
+  payloadJson          Json
+  status               String   @default("PENDING")
+  entityType           String?
+  entityId             String?
+  attempts             Int      @default(0)
+  maxAttempts          Int      @default(5)
+  nextAttemptAt        DateTime?
+  lastAttemptAt        DateTime?
+  processedAt          DateTime?
+  processingError      String?
+  reconciliationStatus String   @default("UNMATCHED")
+  reconciliationNotes  String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([providerType, status])
+  @@index([eventType, status])
+  @@index([entityType, entityId])
+  @@index([reconciliationStatus, createdAt])
+  @@index([nextAttemptAt, status])
+}
+
+model LedgerEntry {
+  id                     String                @id @default(uuid())
+  accountId              String
+  financingTransactionId String?
+  paymentId              String?
+  entryType              LedgerEntryType
+  amount                 Decimal
+  currency               String                @default("GHS")
+  description            String?
+  postedAt               DateTime              @default(now())
+  account                LedgerAccount         @relation(fields: [accountId], references: [id])
+  financingTransaction   FinancingTransaction? @relation(fields: [financingTransactionId], references: [id])
+  payment                Payment?              @relation(fields: [paymentId], references: [id])
+  createdAt              DateTime              @default(now())
+
+  @@index([financingTransactionId, postedAt])
+  @@index([paymentId, postedAt])
+  @@index([accountId, postedAt])
+}
+
+model LimitRecord {
+  id             String        @id @default(uuid())
+  scope          LimitScope
+  programmeId    String?
+  counterpartyId String?
+  currency       String        @default("GHS")
+  limitAmount    Decimal
+  utilisedAmount Decimal       @default(0)
+  reservedAmount Decimal       @default(0)
+  availableAmount Decimal      @default(0)
+  effectiveFrom  DateTime      @default(now())
+  expiresAt      DateTime?
+  status         String        @default("ACTIVE")
+  covenantJson   Json?
+  programme      Programme?    @relation(fields: [programmeId], references: [id])
+  counterparty   Counterparty? @relation(fields: [counterpartyId], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([scope, programmeId, counterpartyId, currency, status])
+  @@index([expiresAt])
+}
+
+model ExposureSnapshot {
+  id             String        @id @default(uuid())
+  scope          LimitScope
+  programmeId    String?
+  counterpartyId String?
+  currency       String        @default("GHS")
+  exposureAmount Decimal       @default(0)
+  availableLimit Decimal?
+  asOfDate       DateTime      @default(now())
+  sourceJson     Json?
+  programme      Programme?    @relation(fields: [programmeId], references: [id])
+  counterparty   Counterparty? @relation(fields: [counterpartyId], references: [id])
+  createdAt      DateTime      @default(now())
+
+  @@index([scope, programmeId, counterpartyId, currency, asOfDate])
+}
+
+model CreditDecision {
+  id             String          @id @default(uuid())
+  counterpartyId String?
+  programmeId    String?
+  financingTransactionId String?
+  score          Decimal?
+  rating         RiskRating?
+  outcome        DecisionOutcome
+  reasonCodes    Json?
+  rulesFired     Json?
+  approvedByUserId String?
+  decidedAt      DateTime        @default(now())
+  createdAt      DateTime        @default(now())
+}
+
+model FunderProfile {
+  id               String       @id @default(uuid())
+  counterpartyId   String       @unique
+  currencies       Json?
+  minTenorDays     Int?
+  maxTenorDays     Int?
+  committedCapacity Decimal     @default(0)
+  utilisedCapacity Decimal      @default(0)
+  pricingFloor     Decimal?
+  concentrationPreference Json?
+  eligibilityRules Json?
+  isActive         Boolean      @default(true)
+  counterparty     Counterparty @relation(fields: [counterpartyId], references: [id])
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model InvoiceProvenanceRecord {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  source      String
+  sourceReference String?
+  payloadHash String?
+  payloadJson Json?
+  capturedAt  DateTime @default(now())
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+}
+
+model MaturityObligation {
+  id                     String                @id @default(uuid())
+  financingTransactionId String
+  programmeId            String
+  obligorId              String
+  currency               String                @default("GHS")
+  principalAmount        Decimal
+  feeAmount              Decimal               @default(0)
+  interestAmount         Decimal               @default(0)
+  outstandingAmount      Decimal
+  dueDate                DateTime
+  status                 ObligationStatus       @default(OPEN)
+  financingTransaction   FinancingTransaction   @relation(fields: [financingTransactionId], references: [id])
+  programme              Programme              @relation(fields: [programmeId], references: [id])
+  payments               PaymentApplication[]
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  @@index([programmeId, obligorId, status, dueDate])
+  @@index([financingTransactionId])
+}
+
+model PaymentApplication {
+  id                  String             @id @default(uuid())
+  paymentId           String
+  obligationId        String
+  appliedAmount       Decimal
+  appliedAt           DateTime           @default(now())
+  payment             Payment            @relation(fields: [paymentId], references: [id])
+  obligation          MaturityObligation @relation(fields: [obligationId], references: [id])
+  createdAt           DateTime           @default(now())
+}
+
+model ReconciliationItem {
+  id               String               @id @default(uuid())
+  paymentId        String?
+  ledgerEntryId    String?
+  statementReference String?
+  counterpartyName String?
+  currency         String               @default("GHS")
+  statementAmount  Decimal
+  statementDate    DateTime
+  status           ReconciliationStatus @default(UNMATCHED)
+  matchConfidence  Decimal?
+  investigationNotes String?
+  payment          Payment?             @relation(fields: [paymentId], references: [id])
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([status, statementDate])
+  @@index([paymentId])
+  @@index([statementReference])
+}
+
+model InvestorRecord {
+  id             String       @id @default(uuid())
+  counterpartyId String
+  commitmentAmount Decimal    @default(0)
+  drawnAmount      Decimal    @default(0)
+  distributionAmount Decimal  @default(0)
+  navAmount         Decimal?
+  valuationDate     DateTime?
+  reportingPackJson Json?
+  counterparty      Counterparty @relation(fields: [counterpartyId], references: [id])
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model DocumentRecord {
+  id                     String                @id @default(uuid())
+  counterpartyId         String?
+  programmeId            String?
+  invoiceId              String?
+  financingTransactionId String?
+  documentType           String
+  title                  String
+  description            String?
+  version                Int                   @default(1)
+  fileName               String                @default("")
+  originalFileName       String?
+  fileKey                String                @default("")
+  fileUrl                String?
+  mimeType               String?
+  sizeBytes              Int?
+  checksum               String?
+  storageProvider        String                @default("local")
+  status                 DocumentStatus        @default(ACTIVE)
+  uploadedById           String?
+  verifiedById           String?
+  verifiedAt             DateTime?
+  rejectedAt             DateTime?
+  rejectionReason        String?
+  expiresAt              DateTime?
+  storageUrl             String?
+  metadataJson           Json?
+  eSignRequired          Boolean               @default(false)
+  signedAt               DateTime?
+  retentionUntil         DateTime?
+  uploadedBy             User?                 @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
+  verifiedBy             User?                 @relation("DocumentVerifiedBy", fields: [verifiedById], references: [id])
+  counterparty           Counterparty?         @relation(fields: [counterpartyId], references: [id])
+  programme              Programme?            @relation(fields: [programmeId], references: [id])
+  invoice                Invoice?              @relation(fields: [invoiceId], references: [id])
+  financingTransaction   FinancingTransaction? @relation(fields: [financingTransactionId], references: [id])
+  invoiceImportBatches   InvoiceImportBatch[]
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  @@index([counterpartyId, status])
+  @@index([programmeId, status])
+  @@index([invoiceId, status])
+  @@index([financingTransactionId, status])
+  @@index([status, createdAt])
+}
+
+model WorkflowCase {
+  id                     String                @id @default(uuid())
+  caseType               String
+  status                 WorkflowCaseStatus    @default(OPEN)
+  priority               String                @default("NORMAL")
+  assignedRole           String?
+  assignedUserId         String?
+  counterpartyId         String?
+  programmeId            String?
+  financingTransactionId String?
+  dueAt                  DateTime?
+  slaHours               Int?
+  historyJson            Json?
+  counterparty           Counterparty?         @relation(fields: [counterpartyId], references: [id])
+  programme              Programme?            @relation(fields: [programmeId], references: [id])
+  financingTransaction   FinancingTransaction? @relation(fields: [financingTransactionId], references: [id])
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+}
+
+model NotificationLog {
+  id              String              @id @default(uuid())
+  recipientUserId String?
+  counterpartyId  String?
+  userId          String?
+  channel         NotificationChannel
+  provider        String?
+  providerMessageId String?
+  templateKey     String?
+  subject         String?
+  message         String              @default("")
+  recipient       String              @default("")
+  payloadJson     Json?
+  status          NotificationStatus  @default(PENDING)
+  scheduledAt     DateTime?
+  sentAt          DateTime?
+  failedAt        DateTime?
+  failureReason   String?
+  attempts        Int                 @default(0)
+  lastAttemptAt   DateTime?
+  counterparty    Counterparty?       @relation(fields: [counterpartyId], references: [id])
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([status, scheduledAt])
+  @@index([recipientUserId])
+  @@index([counterpartyId])
+}
+
+model ReportDefinition {
+  id              String   @id @default(uuid())
+  code            String   @unique
+  name            String
+  category        String
+  description     String?
+  parametersJson  Json?
+  scheduleJson    Json?
+  exportFormats   Json?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ApprovalRequest {
+  id              String   @id @default(uuid())
+  entityType      String
+  entityId        String
+  action          String
+  status          String   @default("PENDING")
+  requestedById   String
+  approvedById    String?
+  rejectedById    String?
+  requestPayload  Json?
+  approvalComment String?
+  rejectionReason String?
+  requestedAt     DateTime @default(now())
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
+  @@index([entityType, entityId])
+  @@index([requestedById])
+}
+
+model DynamicDiscountingOffer {
+  id                 String   @id @default(uuid())
+  programmeId        String?
+  buyerId            String
+  supplierId         String
+  invoiceId          String?
+  currency           String   @default("GHS")
+  invoiceAmount      Decimal
+  buyerCashAvailable Decimal?
+  discountModel      String
+  targetYield        Decimal?
+  discountRate       Decimal
+  discountAmount     Decimal
+  netPaymentAmount   Decimal
+  daysAccelerated    Int
+  status             String   @default("OFFERED")
+  requestedBy        String?
+  expiresAt          DateTime?
+  acceptedAt         DateTime?
+  rulesJson          Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([programmeId])
+  @@index([buyerId])
+  @@index([supplierId])
+}
+
+model ReceivablesFacility {
+  id                     String   @id @default(uuid())
+  programmeId            String?
+  supplierId             String
+  debtorId               String?
+  facilityType           String
+  recourseType           String
+  disclosed              Boolean  @default(false)
+  currency               String   @default("GHS")
+  facilityLimit          Decimal
+  advanceRate            Decimal
+  reserveRate            Decimal  @default(0)
+  utilisedAmount         Decimal  @default(0)
+  status                 String   @default("DRAFT")
+  assignmentNoticeStatus String?
+  lockboxAccount         String?
+  eligibilityRules       Json?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([programmeId])
+  @@index([supplierId])
+}
+
+model FunderMarketplaceBid {
+  id                     String   @id @default(uuid())
+  financingTransactionId String?
+  invoiceId              String?
+  funderId               String
+  bidType                String   @default("PARTICIPATION")
+  currency               String   @default("GHS")
+  offeredAmount          Decimal
+  minYield               Decimal?
+  maxTenorDays           Int?
+  participationStatus    String   @default("SUBMITTED")
+  validUntil             DateTime?
+  conditionsJson         Json?
+  confirmedAt            DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([financingTransactionId])
+  @@index([funderId])
+}
+
+model EsgScorecard {
+  id                   String   @id @default(uuid())
+  counterpartyId       String
+  programmeId          String?
+  provider             String?
+  score                Decimal
+  tier                 String?
+  asOfDate             DateTime @default(now())
+  kpiJson              Json?
+  evidenceJson         Json?
+  pricingAdjustmentBps Decimal  @default(0)
+  status               String   @default("ACTIVE")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([counterpartyId])
+}
+
+model IntegrationConnection {
+  id               String           @id @default(uuid())
+  name             String
+  providerType     String
+  providerKey      String           @default("mock")
+  systemType       String?
+  status           String           @default("DISABLED")
+  environment      String           @default("SANDBOX")
+  baseUrl          String?
+  authType         String?
+  credentialsJson  Json?
+  configJson       Json?
+  credentialsRef   String?
+  idempotencyKey   String?
+  retryPolicyJson  Json?
+  lastSyncAt       DateTime?
+  lastTestedAt     DateTime?
+  lastSuccessfulAt DateTime?
+  lastFailedAt     DateTime?
+  failureReason    String?
+  circuitState     String           @default("CLOSED")
+  fallbackMode     String?
+  createdById      String?
+  logs             IntegrationLog[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([systemType])
+  @@index([providerType, providerKey])
+  @@index([status])
+}
+
+model IntegrationLog {
+  id            String                 @id @default(uuid())
+  connectionId  String?
+  providerType  String
+  providerKey   String?
+  direction     String
+  operation     String
+  entityType    String?
+  entityId      String?
+  requestJson   Json?
+  responseJson  Json?
+  status        String
+  statusCode    Int?
+  errorMessage  String?
+  attempt       Int                    @default(1)
+  durationMs    Int?
+  connection    IntegrationConnection? @relation(fields: [connectionId], references: [id])
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@index([providerType, providerKey])
+  @@index([status, createdAt])
+  @@index([entityType, entityId])
+  @@index([connectionId])
+}
+
+model WebhookEndpoint {
+  id          String            @id @default(uuid())
+  name        String
+  url         String
+  secret      String?
+  events      String[]
+  status      String            @default("ACTIVE")
+  createdById String?
+  deliveries  WebhookDelivery[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([status])
+}
+
+model WebhookDelivery {
+  id             String          @id @default(uuid())
+  endpointId     String
+  eventType      String
+  entityType     String?
+  entityId       String?
+  payloadJson    Json
+  status         String          @default("PENDING")
+  attempts       Int             @default(0)
+  lastAttemptAt  DateTime?
+  nextAttemptAt  DateTime?
+  responseStatus Int?
+  responseBody   String?
+  errorMessage   String?
+  endpoint       WebhookEndpoint @relation(fields: [endpointId], references: [id])
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([eventType])
+  @@index([entityType, entityId])
+}
+
+model AiAnomalySignal {
+  id             String   @id @default(uuid())
+  invoiceId      String?
+  paymentId      String?
+  counterpartyId String?
+  modelName      String
+  modelVersion   String
+  signalType     String
+  severity       String   @default("MEDIUM")
+  score          Decimal
+  rationaleJson  Json?
+  status         String   @default("OPEN")
+  reviewedByUserId String?
+  reviewedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status])
+}
+
+model InvestorReportSnapshot {
+  id                      String   @id @default(uuid())
+  investorRecordId         String?
+  counterpartyId           String?
+  reportType               String
+  periodStart              DateTime
+  periodEnd                DateTime
+  navAmount                Decimal?
+  committedCapital         Decimal?
+  drawnCapital             Decimal?
+  distributedCapital       Decimal?
+  grossYield               Decimal?
+  delinquencyRate          Decimal?
+  weightedAverageLifeDays  Int?
+  reportJson               Json?
+  status                   String   @default("GENERATED")
+  generatedAt              DateTime @default(now())
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([reportType])
+}
+
+model AuditLog {
+  id          String      @id @default(uuid())
+  actorUserId String?
+  action      AuditAction
+  entityType  String
+  entityId    String?
+  beforeJson  Json?
+  afterJson   Json?
+  reason      String?
+  ipAddress   String?
+  userAgent   String?
+  actorUser   User?       @relation(fields: [actorUserId], references: [id])
+  createdAt   DateTime    @default(now())
+}
