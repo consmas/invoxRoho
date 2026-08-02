@@ -14,6 +14,34 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
+REQUIRED_ENV="
+POSTGRES_PASSWORD
+JWT_SECRET
+PAYMENT_WEBHOOK_SECRET
+ERP_WEBHOOK_SECRET
+EINVOICING_WEBHOOK_SECRET
+WEBHOOK_SIGNING_SECRET
+APP_URL
+NEXT_PUBLIC_API_URL
+CORS_ORIGINS
+"
+
+missing=""
+for key in $REQUIRED_ENV; do
+  if ! grep -Eq "^[[:space:]]*${key}=" .env; then
+    missing="${missing} ${key}"
+  fi
+done
+
+if [ -n "$missing" ]; then
+  echo "ERROR: .env is missing required production variables:" >&2
+  for key in $missing; do
+    echo "  - $key" >&2
+  done
+  echo "Copy .env.production.example to .env and set real values before deploying." >&2
+  exit 1
+fi
+
 COMPOSE_FILE="docker-compose.yml"
 if [ ! -f "$COMPOSE_FILE" ]; then
   COMPOSE_FILE="compose.yml"
