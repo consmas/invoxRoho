@@ -8,6 +8,8 @@ import {
   AuditAction,
   FinancingStatus,
   InvoiceStatus,
+  LedgerEntryType,
+  LimitScope,
   OnboardingStatus,
   PaymentStatus,
   Prisma,
@@ -250,6 +252,9 @@ export class ApprovalsService {
           where: { id: approval.entityId },
           data: { status: FinancingStatus.CLOSED },
         });
+      case 'PRODUCT_ACTION':
+      case 'PHASE2_ACTION':
+        return this.executePhase2Approval(approval);
       case 'VERIFY_BANK_ACCOUNT':
         return this.prisma.bankAccount.update({
           where: { id: approval.entityId },
@@ -264,5 +269,160 @@ export class ApprovalsService {
           `Unsupported approval action: ${approval.action}`,
         );
     }
+  }
+
+  private executePhase2Approval(
+    approval: Awaited<ReturnType<ApprovalsService['findOne']>>,
+  ) {
+    const payload = approval.requestPayload as {
+      resource?: string;
+      action?: string;
+    } | null;
+    const resource = payload?.resource;
+    const action = payload?.action;
+    if (!resource || !action) {
+      throw new BadRequestException('Product approval payload is invalid');
+    }
+    return this.prisma.$transaction(async (tx) => {
+      switch (resource) {
+        case 'dynamic-discounting-offers': {
+          const current = await tx.dynamicDiscountingOffer.findUniqueOrThrow({
+            where: { id: approval.entityId },
+          });
+          const patch =
+            action === 'accept'
+              ? { status: 'ACCEPTED', acceptedAt: new Date() }
+              : action === 'settle'
+                ? { status: 'SETTLED' }
+                : action === 'cancel'
+                  ? { status: 'CANCELLED' }
+                  : undefined;
+          if (!patch) throw new BadRequestException(`Unsupported product action: ${action}`);
+          const row = await tx.dynamicDiscountingOffer.update({
+            where: { id: approval.entityId },
+            data: patch,
+          });
+          if (action === 'settle') {
+            await postApprovalLedger(tx, row.currency, [
+              ['5100', 'Dynamic discount expense', LedgerEntryType.DEBIT, current.discountAmount],
+              ['1000', 'Cash settlement', LedgerEntryType.CREDIT, current.discountAmount],
+            ]);
+          }
+          return row;
+        }
+        case 'receivables-facilities': {
+          const row = await tx.receivablesFacility.update({
+            where: { id: approval.entityId },
+            data: phase2StatusPatch(action, {
+              approve: 'APPROVED',
+              activate: 'ACTIVE',
+              suspend: 'SUSPENDED',
+              close: 'CLOSED',
+            }),
+          });
+          if (action === 'activate') {
+            await tx.limitRecord.create({
+              data: {
+                scope: LimitScope.SUPPLIER,
+                programmeId: row.programmeId,
+                counterpartyId: row.supplierId,
+                currency: row.currency,
+                limitAmount: row.facilityLimit,
+                availableAmount: new Prisma.Decimal(row.facilityLimit).minus(
+                  row.utilisedAmount,
+                ),
+                covenantJson: { source: 'product_approval_activation' },
+              },
+            });
+            await tx.exposureSnapshot.create({
+              data: {
+                scope: LimitScope.SUPPLIER,
+                programmeId: row.programmeId,
+                counterpartyId: row.supplierId,
+                currency: row.currency,
+                exposureAmount: row.utilisedAmount,
+                sourceJson: { source: 'product_approval_activation' },
+              },
+            });
+          }
+          return row;
+        }
+        case 'funder-marketplace-bids': {
+          const row = await tx.funderMarketplaceBid.update({
+            where: { id: approval.entityId },
+            data:
+              action === 'confirm'
+                ? { participationStatus: 'CONFIRMED', confirmedAt: new Date() }
+                : phase2StatusPatch(action, {
+                    allocate: 'ALLOCATED',
+                    withdraw: 'WITHDRAWN',
+                  }, 'participationStatus'),
+          });
+          if (action === 'allocate') {
+            await postApprovalLedger(tx, row.currency, [
+              ['1200', 'Marketplace funded asset', LedgerEntryType.DEBIT, row.offeredAmount],
+              ['2200', 'Marketplace funder allocation payable', LedgerEntryType.CREDIT, row.offeredAmount],
+            ]);
+          }
+          return row;
+        }
+        case 'esg-scorecards':
+          return tx.esgScorecard.update({
+            where: { id: approval.entityId },
+            data: phase2StatusPatch(action, {
+              review: 'UNDER_REVIEW',
+              activate: 'ACTIVE',
+              expire: 'EXPIRED',
+            }),
+          });
+        default:
+          throw new BadRequestException(`Unsupported product resource: ${resource}`);
+      }
+    });
+  }
+}
+
+function phase2StatusPatch(
+  action: string,
+  states: Record<string, string>,
+  field = 'status',
+) {
+  const status = states[action];
+  if (!status) throw new BadRequestException(`Unsupported product action: ${action}`);
+  return { [field]: status };
+}
+
+async function postApprovalLedger(
+  tx: Prisma.TransactionClient,
+  currency: string,
+  entries: [string, string, LedgerEntryType, unknown][],
+) {
+  const totals = entries.reduce(
+    (acc, [, , type, amount]) => {
+      const value = new Prisma.Decimal(String(amount));
+      if (type === LedgerEntryType.DEBIT) acc.debits = acc.debits.plus(value);
+      else acc.credits = acc.credits.plus(value);
+      return acc;
+    },
+    { debits: new Prisma.Decimal(0), credits: new Prisma.Decimal(0) },
+  );
+  if (!totals.debits.equals(totals.credits)) {
+    throw new BadRequestException('Approval ledger posting is not balanced');
+  }
+  for (const [code, name, entryType, amount] of entries) {
+    const account = await tx.ledgerAccount.upsert({
+      where: { code },
+      update: {},
+      create: { code, name, currency },
+    });
+    await tx.ledgerEntry.create({
+      data: {
+        accountId: account.id,
+        entryType,
+        amount: String(amount),
+        currency,
+        description: name,
+      },
+    });
   }
 }

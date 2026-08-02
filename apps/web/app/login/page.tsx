@@ -55,7 +55,7 @@ export default function LoginPage() {
         </div>
         <div>
           <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Release 1
+            Core Platform
           </p>
           <h1 className="mt-3 max-w-xl text-4xl font-semibold tracking-tight">
             Role-based access for approved payables finance operations.

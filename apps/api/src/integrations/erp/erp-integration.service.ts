@@ -11,7 +11,7 @@ export class ErpIntegrationService {
     const providerKey = config.get<string>('ERP_PROVIDER') ?? 'mock';
     if (providerKey !== 'mock') {
       throw new BadRequestException(
-        'Live ERP providers are not enabled in Stage 8E; use mock.',
+        'Live ERP providers are not enabled; use mock.',
       );
     }
     this.provider = new MockErpProvider();

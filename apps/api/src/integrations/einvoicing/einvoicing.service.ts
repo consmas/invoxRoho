@@ -11,7 +11,7 @@ export class EInvoicingService {
     const providerKey = config.get<string>('EINVOICING_PROVIDER') ?? 'mock';
     if (providerKey !== 'mock') {
       throw new BadRequestException(
-        'Live e-invoicing providers are not enabled in Stage 8E; use mock.',
+        'Live e-invoicing providers are not enabled; use mock.',
       );
     }
     this.provider = new MockEInvoicingProvider();

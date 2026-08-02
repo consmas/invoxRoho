@@ -18,12 +18,14 @@ import { PaymentProvider } from '../integrations/payments/payment-provider.inter
 import { mapProviderStatus } from '../integrations/payments/payment-status.mapper';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { verifyWebhookSignature } from '../common/security';
 
 @Injectable()
 export class PaymentsService {
   private readonly provider: PaymentProvider;
   private readonly providerKey: string;
   private readonly webhookSecret: string;
+  private readonly allowPlaintextWebhookSecrets: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -36,6 +38,8 @@ export class PaymentsService {
     this.providerKey = config.get<string>('PAYMENT_PROVIDER') ?? 'sandbox';
     this.webhookSecret =
       config.get<string>('PAYMENT_WEBHOOK_SECRET') ?? 'dev_payment_secret';
+    const appEnv = config.get<string>('APP_ENV') ?? config.get<string>('NODE_ENV');
+    this.allowPlaintextWebhookSecrets = appEnv !== 'production';
   }
 
   findAll() {
@@ -301,7 +305,12 @@ export class PaymentsService {
       where: { eventReference },
     });
     if (existing) return { duplicate: true, event: existing };
-    const signatureValid = !signature || signature === this.webhookSecret;
+    const signatureValid = verifyWebhookSignature({
+      payload,
+      secret: this.webhookSecret,
+      signature,
+      allowPlaintextSecret: this.allowPlaintextWebhookSecrets,
+    });
     const payment = await this.findPaymentForWebhook(payload, parsed);
     const event = await this.prisma.paymentWebhookEvent.create({
       data: {

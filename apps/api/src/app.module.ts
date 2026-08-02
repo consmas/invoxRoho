@@ -13,6 +13,7 @@ import { InvoicesModule } from './invoices/invoices.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OperationsModule } from './operations/operations.module';
 import { PaymentsModule } from './payments/payments.module';
+import { Phase2ProductsModule } from './phase2-products/phase2-products.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProgrammesModule } from './programmes/programmes.module';
 import { RolesModule } from './roles/roles.module';
@@ -42,6 +43,7 @@ import { RequestContextMiddleware } from './common/request-context.middleware';
     DocumentsModule,
     NotificationsModule,
     PaymentsModule,
+    Phase2ProductsModule,
     WebhooksModule,
     FinancingModule,
     OperationsModule,

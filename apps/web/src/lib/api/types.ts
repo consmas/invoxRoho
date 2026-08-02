@@ -96,6 +96,161 @@ export type OperationsDashboard = {
   ledgerImbalance: string | number;
 };
 
+export type Phase2Resource =
+  | "dynamic-discounting-offers"
+  | "receivables-facilities"
+  | "funder-marketplace-bids"
+  | "esg-scorecards"
+  | "ai-anomaly-signals"
+  | "investor-report-snapshots";
+
+export type Phase2Dashboard = {
+  openDynamicDiscountingOffers: number;
+  acceptedDynamicDiscountingOffers: number;
+  activeReceivablesFacilities: number;
+  submittedMarketplaceBids: number;
+  confirmedMarketplaceBids: number;
+  activeEsgScorecards: number;
+  openAiAnomalySignals: number;
+  highSeverityAiAnomalySignals: number;
+  investorReportSnapshots: number;
+  dynamicDiscountingInvoiceAmount: string | number;
+  dynamicDiscountingDiscountAmount: string | number;
+  dynamicDiscountingNetPaymentAmount: string | number;
+  receivablesFacilityLimit: string | number;
+  receivablesUtilisedAmount: string | number;
+  marketplaceOfferedAmount: string | number;
+  investorNavAmount: string | number;
+  investorCommittedCapital: string | number;
+  investorDrawnCapital: string | number;
+};
+
+export type DynamicDiscountingOffer = {
+  id: string;
+  programmeId?: string | null;
+  buyerId: string;
+  supplierId: string;
+  invoiceId?: string | null;
+  currency: string;
+  invoiceAmount: string;
+  buyerCashAvailable?: string | null;
+  discountModel: string;
+  targetYield?: string | null;
+  discountRate: string;
+  discountAmount: string;
+  netPaymentAmount: string;
+  daysAccelerated: number;
+  status: string;
+  requestedBy?: string | null;
+  expiresAt?: string | null;
+  acceptedAt?: string | null;
+  rulesJson?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ReceivablesFacility = {
+  id: string;
+  programmeId?: string | null;
+  supplierId: string;
+  debtorId?: string | null;
+  facilityType: string;
+  recourseType: string;
+  disclosed: boolean;
+  currency: string;
+  facilityLimit: string;
+  advanceRate: string;
+  reserveRate: string;
+  utilisedAmount: string;
+  status: string;
+  assignmentNoticeStatus?: string | null;
+  lockboxAccount?: string | null;
+  eligibilityRules?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FunderMarketplaceBid = {
+  id: string;
+  financingTransactionId?: string | null;
+  invoiceId?: string | null;
+  funderId: string;
+  bidType: string;
+  currency: string;
+  offeredAmount: string;
+  minYield?: string | null;
+  maxTenorDays?: number | null;
+  participationStatus: string;
+  validUntil?: string | null;
+  conditionsJson?: Record<string, unknown> | null;
+  confirmedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type EsgScorecard = {
+  id: string;
+  counterpartyId: string;
+  programmeId?: string | null;
+  provider?: string | null;
+  score: string;
+  tier?: string | null;
+  asOfDate: string;
+  kpiJson?: Record<string, unknown> | null;
+  evidenceJson?: Record<string, unknown> | null;
+  pricingAdjustmentBps: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AiAnomalySignal = {
+  id: string;
+  invoiceId?: string | null;
+  paymentId?: string | null;
+  counterpartyId?: string | null;
+  modelName: string;
+  modelVersion: string;
+  signalType: string;
+  severity: string;
+  score: string;
+  rationaleJson?: Record<string, unknown> | null;
+  status: string;
+  reviewedByUserId?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type InvestorReportSnapshot = {
+  id: string;
+  investorRecordId?: string | null;
+  counterpartyId?: string | null;
+  reportType: string;
+  periodStart: string;
+  periodEnd: string;
+  navAmount?: string | null;
+  committedCapital?: string | null;
+  drawnCapital?: string | null;
+  distributedCapital?: string | null;
+  grossYield?: string | null;
+  delinquencyRate?: string | null;
+  weightedAverageLifeDays?: number | null;
+  reportJson?: Record<string, unknown> | null;
+  status: string;
+  generatedAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Phase2Record =
+  | DynamicDiscountingOffer
+  | ReceivablesFacility
+  | FunderMarketplaceBid
+  | EsgScorecard
+  | AiAnomalySignal
+  | InvestorReportSnapshot;
+
 export type Health = {
   status: string;
   service: string;

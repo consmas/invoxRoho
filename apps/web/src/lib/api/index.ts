@@ -13,6 +13,9 @@ import type {
   OperationsDashboard,
   Payment,
   PaymentWebhookEvent,
+  Phase2Dashboard,
+  Phase2Record,
+  Phase2Resource,
   ProviderCallbackReconciliation,
   ProviderWebhookEvent,
   Programme,
@@ -203,6 +206,56 @@ export const updateOperationRecord = async (
   id: string,
   data: Record<string, unknown>,
 ) => (await api.patch(`/operations/${resource}/${id}`, { data })).data;
+
+export const getPhase2Dashboard = async () =>
+  (await api.get<Phase2Dashboard>("/phase2-products/dashboard")).data;
+export const getPhase2Records = async (resource: Phase2Resource) =>
+  (await api.get<Phase2Record[]>(`/phase2-products/${resource}`)).data;
+export const getPhase2Record = async (resource: Phase2Resource, id: string) =>
+  (await api.get<Phase2Record>(`/phase2-products/${resource}/${id}`)).data;
+export const calculatePhase2Record = async (
+  resource: Phase2Resource,
+  data: Record<string, unknown>,
+) =>
+  (
+    await api.post<Record<string, unknown>>(
+      `/phase2-products/${resource}/calculate`,
+      data,
+    )
+  ).data;
+export const createPhase2Record = async (
+  resource: Phase2Resource,
+  data: Record<string, unknown>,
+) => (await api.post<Phase2Record>(`/phase2-products/${resource}`, { data })).data;
+export const updatePhase2Record = async (
+  resource: Phase2Resource,
+  id: string,
+  data: Record<string, unknown>,
+) => (await api.patch<Phase2Record>(`/phase2-products/${resource}/${id}`, { data })).data;
+export const deletePhase2Record = async (resource: Phase2Resource, id: string) =>
+  (await api.delete<Phase2Record>(`/phase2-products/${resource}/${id}`)).data;
+export const runPhase2Action = async (
+  resource: Phase2Resource,
+  id: string,
+  action: string,
+  payload: Record<string, unknown> = {},
+  idempotencyKey?: string,
+) =>
+  (
+    await api.post<Phase2Record>(
+      `/phase2-products/${resource}/${id}/actions/${action}`,
+      payload,
+      idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : undefined,
+    )
+  ).data;
+export const exportPhase2Csv = async (resource: Phase2Resource) =>
+  (
+    await api.get(`/phase2-products/${resource}/export/csv`, {
+      responseType: "blob",
+    })
+  ).data as Blob;
+
+export const getAuditLogs = async () => (await api.get<unknown[]>("/audit")).data;
 
 export const getDocuments = async () => (await api.get<unknown[]>("/documents")).data;
 export const getDocument = async (id: string) => (await api.get(`/documents/${id}`)).data;

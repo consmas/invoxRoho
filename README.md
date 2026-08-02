@@ -2,7 +2,7 @@
 
 INVOX is a Supply Chain Finance platform. Release 1 focuses on Reverse Factoring / Approved Payables Finance.
 
-Current stage: Stage 8E, ERP invoice import and e-invoicing preparation.
+Current stage: Stage 8F, provider webhook hardening, retry queues and callback reconciliation.
 
 ## Stack
 
@@ -184,12 +184,35 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 ## Docker
 
 ```bash
-docker compose -f infrastructure/docker/docker-compose.yml up -d
-docker compose -f infrastructure/docker/docker-compose.yml ps
-docker compose -f infrastructure/docker/docker-compose.yml down
+cp .env.production.example .env
+# edit .env with real production secrets, domain/IP URLs and CORS origin
+docker compose build
+docker compose up -d
+docker compose ps
 ```
 
-The compose file runs `postgres`, `redis`, `api`, and `pricing-engine`. For early development, running API and pricing manually is also supported.
+The root compose file runs `postgres`, `redis`, `pricing-engine`, `api`, and `web`.
+It runs Prisma migrations before starting the API.
+
+The legacy development compose file remains available:
+
+```bash
+docker compose -f infrastructure/docker/docker-compose.yml up -d
+```
+
+For a public server, `NEXT_PUBLIC_API_URL` must be the browser-reachable API URL, not the container URL. Example:
+
+```env
+APP_URL=http://YOUR_SERVER_IP:3000
+NEXT_PUBLIC_API_URL=http://YOUR_SERVER_IP:3001
+CORS_ORIGINS=http://YOUR_SERVER_IP:3000
+```
+
+After the first deploy, seed the admin user if needed:
+
+```bash
+docker compose exec api npm run seed:auth
+```
 
 ## Payment Sandbox
 
@@ -208,6 +231,12 @@ Stage 8E adds CSV, Excel, JSON/API and mock ERP invoice imports, batch review, r
 - `docs/integrations/erp-invoice-import.md`
 - `docs/integrations/e-invoicing.md`
 - `docs/templates/invoice-import-template.csv`
+
+## Provider Callbacks
+
+Stage 8F adds hardened ERP/e-invoicing callback capture, retry and reconciliation. See:
+
+- `docs/integrations/provider-webhooks.md`
 
 ## Prisma
 

@@ -7,8 +7,11 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AuditAction, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import { randomUUID } from 'crypto';
 import { AuditService } from '../audit/audit.service';
+import {
+  assertRateLimit,
+  randomToken,
+} from '../common/security';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UsersService } from '../users/users.service';
@@ -31,15 +34,18 @@ export class AuthService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  async login(email: string, password: string) {
-    const user = await this.users.findByEmailForAuth(email.toLowerCase());
+  async login(email: string, password: string, ip = 'unknown') {
+    const normalizedEmail = email.toLowerCase();
+    this.assertAuthRateLimit(`login:ip:${ip}`, 20, 60_000);
+    this.assertAuthRateLimit(`login:email:${normalizedEmail}`, 8, 60_000);
+    const user = await this.users.findByEmailForAuth(normalizedEmail);
 
     if (!user || !user.passwordHash || user.status !== UserStatus.ACTIVE) {
       await this.audit.log({
         action: AuditAction.FAILED_LOGIN,
         entityType: 'User',
         entityId: user?.id,
-        reason: `Failed login for ${email.toLowerCase()}`,
+        reason: `Failed login for ${normalizedEmail}`,
       });
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -91,7 +97,8 @@ export class AuthService {
     return this.toAuthUser(currentUser);
   }
 
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto, ip = 'unknown') {
+    this.assertAuthRateLimit(`register:ip:${ip}`, 5, 60 * 60_000);
     const existing = await this.users.findByEmailForAuth(
       dto.email.toLowerCase(),
     );
@@ -122,7 +129,7 @@ export class AuthService {
   }
 
   async inviteUser(dto: InviteUserDto, actor?: AuthenticatedUser) {
-    const temporaryPassword = `Invite-${randomUUID()}`;
+    const temporaryPassword = `Invite-${randomToken(24)}`;
     const user = await this.users.create(
       {
         ...dto,
@@ -134,7 +141,7 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Invitation failed');
     }
-    const inviteToken = `stub-invite-${user.id}`;
+    const inviteToken = randomToken(32);
     await this.notifications
       .sendTemplateEmail(
         'user.invited',
@@ -170,10 +177,20 @@ export class AuthService {
     return { success: true };
   }
 
-  async requestPasswordReset(dto: ResetPasswordRequestDto) {
+  async requestPasswordReset(dto: ResetPasswordRequestDto, ip = 'unknown') {
+    this.assertAuthRateLimit(`reset:ip:${ip}`, 10, 60 * 60_000);
+    this.assertAuthRateLimit(
+      `reset:email:${dto.email.toLowerCase()}`,
+      5,
+      60 * 60_000,
+    );
     const user = await this.users.findByEmailForAuth(dto.email.toLowerCase());
     if (user) {
-      const resetToken = `stub-reset-${user.id}`;
+      const resetToken = randomToken(32);
+      passwordResetTokens.set(resetToken, {
+        userId: user.id,
+        expiresAt: Date.now() + 15 * 60_000,
+      });
       await this.notifications
         .sendTemplateEmail('password.reset', user.email, {
           userName: displayName(user),
@@ -189,10 +206,12 @@ export class AuthService {
   }
 
   async confirmPasswordReset(dto: ResetPasswordConfirmDto) {
-    const userId = dto.token.startsWith('stub-reset-')
-      ? dto.token.replace('stub-reset-', '')
-      : '';
-    const user = userId ? await this.users.findByIdForAuth(userId) : null;
+    const token = passwordResetTokens.get(dto.token);
+    passwordResetTokens.delete(dto.token);
+    if (!token || token.expiresAt < Date.now()) {
+      throw new UnauthorizedException('Invalid reset token');
+    }
+    const user = await this.users.findByIdForAuth(token.userId);
     if (!user) {
       throw new UnauthorizedException('Invalid reset token');
     }
@@ -228,9 +247,28 @@ export class AuthService {
   }
 
   private appUrl() {
-    return this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
+    const appUrl = this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
+    const parsed = new URL(appUrl);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new UnauthorizedException('APP_URL must use http or https');
+    }
+    return parsed.toString().replace(/\/$/, '');
+  }
+
+  private assertAuthRateLimit(key: string, limit: number, windowMs: number) {
+    assertRateLimit({
+      key,
+      limit,
+      windowMs,
+      message: 'Too many authentication attempts',
+    });
   }
 }
+
+const passwordResetTokens = new Map<
+  string,
+  { userId: string; expiresAt: number }
+>();
 
 function displayName(user: {
   firstName?: string | null;

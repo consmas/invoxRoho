@@ -19,6 +19,7 @@ import { ErpInvoicePayload } from '../integrations/erp/erp-provider.interface';
 import { IntegrationLogService } from '../integrations/integration-log.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { verifyWebhookSignature } from '../common/security';
 
 export type ImportSourceType =
   'CSV' | 'EXCEL' | 'API' | 'ERP' | 'WEBHOOK' | 'MANUAL';
@@ -59,6 +60,7 @@ export class InvoiceImportService {
   private readonly erpWebhookSecret: string;
   private readonly einvoicingWebhookSecret: string;
   private readonly maxCallbackAttempts: number;
+  private readonly allowPlaintextWebhookSecrets: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -80,6 +82,8 @@ export class InvoiceImportService {
     this.maxCallbackAttempts = Number(
       config.get<string>('PROVIDER_WEBHOOK_MAX_RETRIES') ?? 5,
     );
+    const appEnv = config.get<string>('APP_ENV') ?? config.get<string>('NODE_ENV');
+    this.allowPlaintextWebhookSecrets = appEnv !== 'production';
   }
 
   findBatches() {
@@ -557,7 +561,12 @@ export class InvoiceImportService {
     payload: Record<string, unknown>,
     signature?: string,
   ) {
-    return this.processProviderWebhook('EINVOICING', 'mock', payload, signature);
+    return this.processProviderWebhook(
+      'EINVOICING',
+      'mock',
+      payload,
+      signature,
+    );
   }
 
   async retryProviderWebhookEvent(id: string) {
@@ -600,6 +609,7 @@ export class InvoiceImportService {
     }
     const signatureValid = this.validProviderSignature(
       providerType,
+      payload,
       signature,
     );
     const eventType =
@@ -713,7 +723,8 @@ export class InvoiceImportService {
     const eventType = scalarString(payload.eventType) ?? '';
     if (eventType.includes('approval')) {
       const invoice = await this.findInvoiceForCallback(payload);
-      if (!invoice) throw new NotFoundException('Invoice not found for ERP callback');
+      if (!invoice)
+        throw new NotFoundException('Invoice not found for ERP callback');
       const updated = await this.prisma.invoice.update({
         where: { id: invoice.id },
         data: {
@@ -747,15 +758,12 @@ export class InvoiceImportService {
       : payload.invoice && typeof payload.invoice === 'object'
         ? [payload.invoice as Record<string, unknown>]
         : [];
-    if (!invoices.length) throw new BadRequestException('ERP callback has no invoices');
-    const batch = await this.createBatchFromRows(
-      'WEBHOOK',
-      invoices,
-      {
-        programmeCode: scalarString(payload.programmeCode),
-        sourceReference: scalarString(payload.eventReference),
-      },
-    );
+    if (!invoices.length)
+      throw new BadRequestException('ERP callback has no invoices');
+    const batch = await this.createBatchFromRows('WEBHOOK', invoices, {
+      programmeCode: scalarString(payload.programmeCode),
+      sourceReference: scalarString(payload.eventReference),
+    });
     return {
       entityType: 'InvoiceImportBatch',
       entityId: batch.id,
@@ -773,7 +781,9 @@ export class InvoiceImportService {
       scalarString(payload.status) ??
       scalarString(payload.einvoicingStatus) ??
       'REFERRED';
-    const normalizedStatus = ['VALIDATED', 'FAILED', 'REFERRED'].includes(status)
+    const normalizedStatus = ['VALIDATED', 'FAILED', 'REFERRED'].includes(
+      status,
+    )
       ? status
       : 'REFERRED';
     const updated = await this.prisma.invoice.update({
@@ -794,7 +804,12 @@ export class InvoiceImportService {
         validationErrors:
           normalizedStatus === 'VALIDATED'
             ? Prisma.JsonNull
-            : { messages: [scalarString(payload.reason) ?? 'E-invoicing callback exception'] },
+            : {
+                messages: [
+                  scalarString(payload.reason) ??
+                    'E-invoicing callback exception',
+                ],
+              },
       },
     });
     await this.audit.log({
@@ -824,17 +839,23 @@ export class InvoiceImportService {
   private async findInvoiceForCallback(payload: Record<string, unknown>) {
     const invoiceId = scalarString(payload.invoiceId);
     if (invoiceId) {
-      const row = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
+      const row = await this.prisma.invoice.findUnique({
+        where: { id: invoiceId },
+      });
       if (row) return row;
     }
     const invoiceNumber = scalarString(payload.invoiceNumber);
     if (invoiceNumber) {
-      const row = await this.prisma.invoice.findFirst({ where: { invoiceNumber } });
+      const row = await this.prisma.invoice.findFirst({
+        where: { invoiceNumber },
+      });
       if (row) return row;
     }
     const externalReference = scalarString(payload.externalReference);
     if (externalReference) {
-      const row = await this.prisma.invoice.findFirst({ where: { externalReference } });
+      const row = await this.prisma.invoice.findFirst({
+        where: { externalReference },
+      });
       if (row) return row;
     }
     const fiscalReference =
@@ -843,23 +864,29 @@ export class InvoiceImportService {
     if (fiscalReference) {
       return this.prisma.invoice.findFirst({
         where: {
-          OR: [
-            { fiscalReference },
-            { einvoicingReference: fiscalReference },
-          ],
+          OR: [{ fiscalReference }, { einvoicingReference: fiscalReference }],
         },
       });
     }
     return null;
   }
 
-  private validProviderSignature(providerType: 'ERP' | 'EINVOICING', signature?: string) {
+  private validProviderSignature(
+    providerType: 'ERP' | 'EINVOICING',
+    payload: Record<string, unknown>,
+    signature?: string,
+  ) {
     if (!signature) return false;
     const secret =
       providerType === 'ERP'
         ? this.erpWebhookSecret
         : this.einvoicingWebhookSecret;
-    return signature === secret;
+    return verifyWebhookSignature({
+      payload,
+      secret,
+      signature,
+      allowPlaintextSecret: this.allowPlaintextWebhookSecrets,
+    });
   }
 
   private async createBatchFromRows(

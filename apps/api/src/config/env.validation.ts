@@ -13,6 +13,8 @@ const unsafeProductionValues: Record<string, string[]> = {
   JWT_SECRET: ['change_this_in_dev', 'dev_secret', 'secret', 'password'],
   PAYMENT_WEBHOOK_SECRET: ['dev_payment_secret'],
   WEBHOOK_SIGNING_SECRET: ['dev_webhook_secret'],
+  ERP_WEBHOOK_SECRET: ['dev_erp_secret'],
+  EINVOICING_WEBHOOK_SECRET: ['dev_einvoicing_secret'],
 };
 
 export function validateEnvironment(env: NodeJS.ProcessEnv = process.env) {
@@ -25,6 +27,9 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env) {
 
   const appEnv = env.APP_ENV ?? env.NODE_ENV ?? 'development';
   if (appEnv === 'production') {
+    if (String(env.JWT_SECRET ?? '').length < 32) {
+      throw new Error('JWT_SECRET must be at least 32 characters in production');
+    }
     const unsafe = Object.entries(unsafeProductionValues)
       .filter(([key, values]) => env[key] && values.includes(String(env[key])))
       .map(([key]) => key);
@@ -32,6 +37,23 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env) {
       throw new Error(
         `Unsafe production environment values detected: ${unsafe.join(', ')}`,
       );
+    }
+    const missingWebhookSecrets = [
+      'PAYMENT_WEBHOOK_SECRET',
+      'ERP_WEBHOOK_SECRET',
+      'EINVOICING_WEBHOOK_SECRET',
+    ].filter((key) => !env[key] || String(env[key]).length < 24);
+    if (missingWebhookSecrets.length) {
+      throw new Error(
+        `Production webhook secrets missing or too short: ${missingWebhookSecrets.join(', ')}`,
+      );
+    }
+    const corsOrigins = String(env.CORS_ORIGINS ?? '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean);
+    if (!corsOrigins.length || corsOrigins.some((origin) => origin.includes('localhost') || origin === '*')) {
+      throw new Error('Production CORS_ORIGINS must contain explicit non-localhost origins');
     }
   }
 

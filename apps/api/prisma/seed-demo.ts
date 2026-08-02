@@ -227,8 +227,8 @@ async function main() {
     },
   });
 
-  console.log('Seeded Release 1 demo data.');
-  console.log(`Demo password for all demo users: ${demoPassword}`);
+  console.log('Seeded demo data.');
+  console.log('Demo password is set from DEMO_PASSWORD or the documented local default.');
 }
 
 main()

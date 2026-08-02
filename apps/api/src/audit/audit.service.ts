@@ -18,8 +18,23 @@ type AuditParams = {
 export class AuditService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll() {
+  findAll(filters: {
+    entityType?: string;
+    entityId?: string;
+    actorUserId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  } = {}) {
     return this.prisma.auditLog.findMany({
+      where: {
+        entityType: filters.entityType,
+        entityId: filters.entityId,
+        actorUserId: filters.actorUserId,
+        createdAt: {
+          gte: filters.dateFrom ? new Date(filters.dateFrom) : undefined,
+          lte: filters.dateTo ? new Date(filters.dateTo) : undefined,
+        },
+      },
       include: {
         actorUser: {
           select: {

@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PaymentStatus } from '@prisma/client';
 import { ApprovalsService } from './approvals/approvals.service';
 import { validateEnvironment } from './config/env.validation';
@@ -19,7 +19,27 @@ describe('Stage 7 release readiness controls', () => {
         REDIS_HOST: 'redis',
         REDIS_PORT: '6379',
       }),
-    ).toThrow(/Unsafe production/);
+    ).toThrow(/JWT_SECRET|Unsafe production/);
+  });
+
+  it('allows production startup only with strong secrets and explicit CORS origins', () => {
+    expect(() =>
+      validateEnvironment({
+        APP_ENV: 'production',
+        DATABASE_URL: 'postgresql://example',
+        JWT_SECRET: 'prod_jwt_secret_32_chars_minimum_value',
+        PAYMENT_WEBHOOK_SECRET: 'prod_payment_secret_32_chars_min',
+        ERP_WEBHOOK_SECRET: 'prod_erp_secret_32_chars_minimum',
+        EINVOICING_WEBHOOK_SECRET: 'prod_einvoice_secret_32_chars_min',
+        CORS_ORIGINS: 'https://app.invox.local',
+        APP_PORT: '3001',
+        PRICING_ENGINE_URL: 'http://pricing',
+        CREDIT_ENGINE_URL: 'http://credit',
+        FUNDING_ENGINE_URL: 'http://funding',
+        REDIS_HOST: 'redis',
+        REDIS_PORT: '6379',
+      }),
+    ).not.toThrow();
   });
 
   it('masks credentials and tokens in integration logs', () => {
@@ -60,6 +80,129 @@ describe('Stage 7 release readiness controls', () => {
         { id: 'user-1', email: 'a@b.com', roles: [], permissions: [] },
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('executes approved product lifecycle approval with maker-checker separation', async () => {
+    const approval = {
+      id: 'approval-1',
+      entityType: 'Product:dynamic-discounting-offers',
+      entityId: 'offer-1',
+      action: 'PRODUCT_ACTION',
+      status: 'PENDING',
+      requestedById: 'requester-1',
+      requestPayload: {
+        resource: 'dynamic-discounting-offers',
+        action: 'accept',
+      },
+    };
+    const tx = {
+      dynamicDiscountingOffer: {
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          id: 'offer-1',
+          currency: 'GHS',
+          discountAmount: '10',
+        }),
+        update: jest.fn().mockResolvedValue({
+          id: 'offer-1',
+          status: 'ACCEPTED',
+        }),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn(
+        (callback: (transaction: typeof tx) => Promise<unknown>) =>
+          callback(tx),
+      ),
+      approvalRequest: {
+        findUnique: jest.fn().mockResolvedValue(approval),
+        update: jest.fn().mockResolvedValue({
+          ...approval,
+          status: 'APPROVED',
+          approvedById: 'approver-1',
+        }),
+      },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ email: 'requester@test.local' }),
+      },
+    };
+    const audit = { log: jest.fn().mockResolvedValue({ id: 'audit-1' }) };
+    const notifications = {
+      createLifecycleEmail: jest.fn().mockResolvedValue({ id: 'notice-1' }),
+    };
+    const service = new ApprovalsService(
+      prisma as never,
+      audit as never,
+      notifications as never,
+    );
+
+    const result = await service.approve(
+      'approval-1',
+      { comment: 'approved' },
+      {
+        id: 'approver-1',
+        email: 'approver@test.local',
+        roles: [],
+        permissions: [],
+      },
+    );
+
+    expect(result).toMatchObject({
+      approval: { status: 'APPROVED' },
+      result: { status: 'ACCEPTED' },
+    });
+    expect(tx.dynamicDiscountingOffer.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'offer-1' },
+        data: expect.objectContaining({ status: 'ACCEPTED' }),
+      }),
+    );
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: 'approver-1',
+        action: 'APPROVE',
+        entityType: 'ApprovalRequest',
+      }),
+    );
+  });
+
+  it('rejects invalid product approval payloads', async () => {
+    const approval = {
+      id: 'approval-1',
+      entityType: 'Product:dynamic-discounting-offers',
+      entityId: 'offer-1',
+      action: 'PRODUCT_ACTION',
+      status: 'PENDING',
+      requestedById: 'requester-1',
+      requestPayload: { action: 'accept' },
+    };
+    const prisma = {
+      $transaction: jest.fn((callback: (transaction: unknown) => Promise<unknown>) =>
+        callback({}),
+      ),
+      approvalRequest: {
+        findUnique: jest.fn().mockResolvedValue(approval),
+        update: jest.fn(),
+      },
+    };
+    const service = new ApprovalsService(
+      prisma as never,
+      { log: jest.fn() } as never,
+      { createLifecycleEmail: jest.fn() } as never,
+    );
+
+    await expect(
+      service.approve(
+        'approval-1',
+        {},
+        {
+          id: 'approver-1',
+          email: 'approver@test.local',
+          roles: [],
+          permissions: [],
+        },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.approvalRequest.update).not.toHaveBeenCalled();
   });
 
   it('updates payment status and writes integration/audit logs for mock provider verification', async () => {

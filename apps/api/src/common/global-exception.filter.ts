@@ -48,7 +48,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       requestId: request.requestId,
       timestamp: new Date().toISOString(),
       path: request.originalUrl,
-      message,
+      message: status >= 500 ? 'Internal server error' : message,
     });
   }
 }

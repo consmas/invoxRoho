@@ -1,0 +1,126 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: invox_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-invox_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-invox}
+    volumes:
+      - invox_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: invox_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - invox_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  pricing-engine:
+    build:
+      context: ./services/pricing-engine
+    container_name: invox_pricing_engine
+    restart: unless-stopped
+    expose:
+      - "4001"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:4001/health >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./apps/api
+    container_name: invox_api
+    restart: unless-stopped
+    env_file:
+      - path: ./.env
+        required: false
+    environment:
+      APP_ENV: production
+      NODE_ENV: production
+      APP_PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-invox_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-invox}?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PRICING_ENGINE_URL: http://pricing-engine:4001
+      CREDIT_ENGINE_URL: ${CREDIT_ENGINE_URL:-http://pricing-engine:4001}
+      FUNDING_ENGINE_URL: ${FUNDING_ENGINE_URL:-http://pricing-engine:4001}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:?Set PAYMENT_WEBHOOK_SECRET in .env}
+      ERP_WEBHOOK_SECRET: ${ERP_WEBHOOK_SECRET:?Set ERP_WEBHOOK_SECRET in .env}
+      EINVOICING_WEBHOOK_SECRET: ${EINVOICING_WEBHOOK_SECRET:?Set EINVOICING_WEBHOOK_SECRET in .env}
+      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:?Set WEBHOOK_SIGNING_SECRET in .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env}
+      APP_URL: ${APP_URL:?Set APP_URL in .env}
+    command: sh -c "npx prisma migrate deploy && node dist/main.js"
+    ports:
+      - "${API_PORT:-3001}:3001"
+    volumes:
+      - invox_api_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pricing-engine:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?Set NEXT_PUBLIC_API_URL in .env}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_URL:?Set NEXT_PUBLIC_API_URL in .env}
+    container_name: invox_web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?Set NEXT_PUBLIC_API_URL in .env}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_URL:?Set NEXT_PUBLIC_API_URL in .env}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://localhost:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  invox_postgres_data:
+  invox_redis_data:
+  invox_api_storage:

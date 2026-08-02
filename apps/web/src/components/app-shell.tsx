@@ -23,6 +23,12 @@ import {
   Webhook,
   Workflow,
   Bell,
+  AlertTriangle,
+  HandCoins,
+  Leaf,
+  LineChart,
+  PieChart,
+  TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -97,7 +103,7 @@ const navGroups = [
     ],
   },
   {
-    label: "Release 1",
+    label: "Core Controls",
     items: [
       {
         label: "Approved Payables",
@@ -122,6 +128,53 @@ const navGroups = [
         href: "/approvals",
         icon: ShieldCheck,
         permission: PERMISSIONS.workflowReadV2,
+      },
+    ],
+  },
+  {
+    label: "Product Suite",
+    items: [
+      {
+        label: "Product Overview",
+        href: "/phase2",
+        icon: LineChart,
+        permission: PERMISSIONS.reportRead,
+      },
+      {
+        label: "Dynamic Discounting",
+        href: "/phase2/dynamic-discounting",
+        icon: TrendingUp,
+        permission: PERMISSIONS.reportRead,
+      },
+      {
+        label: "Receivables",
+        href: "/phase2/receivables",
+        icon: HandCoins,
+        permission: PERMISSIONS.reportRead,
+      },
+      {
+        label: "Marketplace Bids",
+        href: "/phase2/marketplace-bids",
+        icon: PieChart,
+        permission: PERMISSIONS.reportRead,
+      },
+      {
+        label: "ESG",
+        href: "/phase2/esg",
+        icon: Leaf,
+        permission: PERMISSIONS.reportRead,
+      },
+      {
+        label: "Anomalies",
+        href: "/phase2/anomalies",
+        icon: AlertTriangle,
+        permission: PERMISSIONS.reportRead,
+      },
+      {
+        label: "Investor Reports",
+        href: "/phase2/investor-reports",
+        icon: BarChart3,
+        permission: PERMISSIONS.investorRead,
       },
     ],
   },
@@ -175,6 +228,12 @@ const navGroups = [
         href: "/webhooks/payments",
         icon: Webhook,
         permission: PERMISSIONS.paymentsWebhookRead,
+      },
+      {
+        label: "Provider Callbacks",
+        href: "/webhooks/providers",
+        icon: Webhook,
+        permission: PERMISSIONS.integrationsRead,
       },
     ],
   },
@@ -308,7 +367,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 API :3001
               </span>
               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-                Release 1
+                Core
               </span>
               <button
                 type="button"

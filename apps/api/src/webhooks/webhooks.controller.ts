@@ -4,10 +4,14 @@ import {
   Delete,
   Get,
   Headers,
+  HttpException,
+  HttpStatus,
   Param,
   Patch,
   Post,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -92,7 +96,9 @@ export class WebhooksController {
   processMockPaymentWebhook(
     @Body() payload: Record<string, unknown>,
     @Headers('x-invox-signature') signature?: string,
+    @Req() request?: Request,
   ) {
+    assertWebhookRateLimit(request, 'payments/mock');
     return this.webhooks.processMockPaymentWebhook(payload, signature);
   }
 
@@ -101,7 +107,9 @@ export class WebhooksController {
   processSandboxPaymentWebhook(
     @Body() payload: Record<string, unknown>,
     @Headers('x-invox-signature') signature?: string,
+    @Req() request?: Request,
   ) {
+    assertWebhookRateLimit(request, 'payments/sandbox');
     return this.webhooks.processPaymentWebhook('sandbox', payload, signature);
   }
 
@@ -110,7 +118,9 @@ export class WebhooksController {
   processErpProviderWebhook(
     @Body() payload: Record<string, unknown>,
     @Headers('x-invox-signature') signature?: string,
+    @Req() request?: Request,
   ) {
+    assertWebhookRateLimit(request, 'providers/erp');
     return this.webhooks.processErpWebhook(payload, signature);
   }
 
@@ -119,7 +129,37 @@ export class WebhooksController {
   processEInvoicingProviderWebhook(
     @Body() payload: Record<string, unknown>,
     @Headers('x-invox-signature') signature?: string,
+    @Req() request?: Request,
   ) {
+    assertWebhookRateLimit(request, 'providers/einvoicing');
     return this.webhooks.processEInvoicingWebhook(payload, signature);
   }
+}
+
+const webhookHits = new Map<string, number[]>();
+const WEBHOOK_WINDOW_MS = 60_000;
+const WEBHOOK_MAX_REQUESTS = 120;
+
+export function resetWebhookRateLimitForTests() {
+  webhookHits.clear();
+}
+
+export function assertWebhookRateLimit(request: Request | undefined, route: string) {
+  const ip =
+    request?.ip ??
+    request?.headers['x-forwarded-for']?.toString().split(',')[0] ??
+    'unknown';
+  const key = `${route}:${ip}`;
+  const now = Date.now();
+  const recent = (webhookHits.get(key) ?? []).filter(
+    (timestamp) => now - timestamp < WEBHOOK_WINDOW_MS,
+  );
+  if (recent.length >= WEBHOOK_MAX_REQUESTS) {
+    throw new HttpException(
+      'Webhook rate limit exceeded',
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
+  }
+  recent.push(now);
+  webhookHits.set(key, recent);
 }

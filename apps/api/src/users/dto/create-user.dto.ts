@@ -5,6 +5,7 @@ import {
   IsEnum,
   IsOptional,
   IsString,
+  Matches,
   MinLength,
 } from 'class-validator';
 
@@ -25,7 +26,11 @@ export class CreateUserDto {
   phone?: string;
 
   @IsString()
-  @MinLength(8)
+  @MinLength(12)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/, {
+    message:
+      'password must include uppercase, lowercase, number and symbol characters',
+  })
   password: string;
 
   @IsOptional()

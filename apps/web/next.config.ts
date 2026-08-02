@@ -5,6 +5,7 @@ import type { NextConfig } from "next";
 const appRoot = dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   outputFileTracingRoot: appRoot,
 };
 

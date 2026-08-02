@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import type { Request } from 'express';
+import { requestIp } from '../common/security';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
 import { RequirePermissions } from './decorators/permissions.decorator';
@@ -20,14 +22,14 @@ export class AuthController {
 
   @Public()
   @Post('login')
-  login(@Body() dto: LoginDto) {
-    return this.auth.login(dto.email, dto.password);
+  login(@Body() dto: LoginDto, @Req() request: Request) {
+    return this.auth.login(dto.email, dto.password, requestIp(request));
   }
 
   @Public()
   @Post('register')
-  register(@Body() dto: RegisterDto) {
-    return this.auth.register(dto);
+  register(@Body() dto: RegisterDto, @Req() request: Request) {
+    return this.auth.register(dto, requestIp(request));
   }
 
   @Post('logout')
@@ -59,8 +61,11 @@ export class AuthController {
 
   @Public()
   @Post('reset-password/request')
-  requestPasswordReset(@Body() dto: ResetPasswordRequestDto) {
-    return this.auth.requestPasswordReset(dto);
+  requestPasswordReset(
+    @Body() dto: ResetPasswordRequestDto,
+    @Req() request: Request,
+  ) {
+    return this.auth.requestPasswordReset(dto, requestIp(request));
   }
 
   @Public()

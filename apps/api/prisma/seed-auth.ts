@@ -507,7 +507,7 @@ async function main() {
   }
 
   const email = process.env.SEED_ADMIN_EMAIL ?? 'admin@invox.local';
-  const password = process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345';
+  const password = process.env.SEED_ADMIN_PASSWORD ?? 'Admin@123456';
   const passwordHash = await bcrypt.hash(password, 12);
   const adminRole = await prisma.role.findUniqueOrThrow({
     where: { name: 'PLATFORM_ADMIN' },
@@ -546,7 +546,7 @@ async function main() {
 
   console.log('Seeded INVOX auth, RBAC roles, permissions and admin user.');
   console.log(`Development admin email: ${email}`);
-  console.log(`Development admin password: ${password}`);
+  console.log('Development admin password is set from SEED_ADMIN_PASSWORD or the documented local default.');
 }
 
 main()

@@ -11,10 +11,13 @@ export class RequestContextMiddleware implements NestMiddleware {
     res: Response,
     next: NextFunction,
   ) {
-    const requestId =
+    const inboundRequestId =
       typeof req.headers['x-request-id'] === 'string'
         ? req.headers['x-request-id']
-        : randomUUID();
+        : '';
+    const requestId = /^[A-Za-z0-9._:-]{1,80}$/.test(inboundRequestId)
+      ? inboundRequestId
+      : randomUUID();
     req.requestId = requestId;
     res.setHeader('X-Request-ID', requestId);
 

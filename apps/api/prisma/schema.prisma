@@ -351,6 +351,14 @@ model Counterparty {
   invoiceImportBatches InvoiceImportBatch[]
   notificationLogs     NotificationLog[]
   complianceChecks     ComplianceCheck[]
+  dynamicDiscountingAsBuyer DynamicDiscountingOffer[] @relation("DynamicDiscountingBuyer")
+  dynamicDiscountingAsSupplier DynamicDiscountingOffer[] @relation("DynamicDiscountingSupplier")
+  receivablesAsSupplier ReceivablesFacility[] @relation("ReceivablesSupplier")
+  receivablesAsDebtor ReceivablesFacility[] @relation("ReceivablesDebtor")
+  marketplaceBids     FunderMarketplaceBid[]
+  esgScorecards       EsgScorecard[]
+  anomalySignals      AiAnomalySignal[]
+  investorReportSnapshots InvestorReportSnapshot[]
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
 }
@@ -547,6 +555,9 @@ model Programme {
   documentsRepository  DocumentRecord[]
   workflowCases        WorkflowCase[]
   invoiceImportBatches InvoiceImportBatch[]
+  dynamicDiscountingOffers DynamicDiscountingOffer[]
+  receivablesFacilities ReceivablesFacility[]
+  esgScorecards        EsgScorecard[]
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
 }
@@ -616,6 +627,9 @@ model Invoice {
   documentsRepository   DocumentRecord[]
   importRowsCreated     InvoiceImportRow[]      @relation("InvoiceImportRowCreatedInvoice")
   importRowsDuplicates  InvoiceImportRow[]      @relation("InvoiceImportRowDuplicateInvoice")
+  dynamicDiscountingOffers DynamicDiscountingOffer[]
+  marketplaceBids       FunderMarketplaceBid[]
+  anomalySignals        AiAnomalySignal[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 
@@ -726,6 +740,7 @@ model FinancingTransaction {
   maturityObligations MaturityObligation[]
   documentsRepository DocumentRecord[]
   workflowCases       WorkflowCase[]
+  marketplaceBids     FunderMarketplaceBid[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 }
@@ -779,6 +794,7 @@ model Payment {
   reconciliationItems    ReconciliationItem[]
   ledgerEntries          LedgerEntry[]
   webhookEvents          PaymentWebhookEvent[]
+  anomalySignals         AiAnomalySignal[]
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
 
@@ -1018,6 +1034,7 @@ model InvestorRecord {
   valuationDate     DateTime?
   reportingPackJson Json?
   counterparty      Counterparty @relation(fields: [counterpartyId], references: [id])
+  reportSnapshots   InvestorReportSnapshot[]
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 }
@@ -1175,12 +1192,18 @@ model DynamicDiscountingOffer {
   expiresAt          DateTime?
   acceptedAt         DateTime?
   rulesJson          Json?
+  programme          Programme? @relation(fields: [programmeId], references: [id])
+  buyer              Counterparty @relation("DynamicDiscountingBuyer", fields: [buyerId], references: [id])
+  supplier           Counterparty @relation("DynamicDiscountingSupplier", fields: [supplierId], references: [id])
+  invoice            Invoice? @relation(fields: [invoiceId], references: [id])
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
   @@index([programmeId])
   @@index([buyerId])
   @@index([supplierId])
+  @@index([invoiceId])
+  @@index([status, createdAt])
 }
 
 model ReceivablesFacility {
@@ -1200,11 +1223,16 @@ model ReceivablesFacility {
   assignmentNoticeStatus String?
   lockboxAccount         String?
   eligibilityRules       Json?
+  programme              Programme? @relation(fields: [programmeId], references: [id])
+  supplier               Counterparty @relation("ReceivablesSupplier", fields: [supplierId], references: [id])
+  debtor                 Counterparty? @relation("ReceivablesDebtor", fields: [debtorId], references: [id])
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
   @@index([programmeId])
   @@index([supplierId])
+  @@index([debtorId])
+  @@index([status, createdAt])
 }
 
 model FunderMarketplaceBid {
@@ -1221,11 +1249,16 @@ model FunderMarketplaceBid {
   validUntil             DateTime?
   conditionsJson         Json?
   confirmedAt            DateTime?
+  financingTransaction   FinancingTransaction? @relation(fields: [financingTransactionId], references: [id])
+  invoice                Invoice? @relation(fields: [invoiceId], references: [id])
+  funder                 Counterparty @relation(fields: [funderId], references: [id])
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
   @@index([financingTransactionId])
+  @@index([invoiceId])
   @@index([funderId])
+  @@index([participationStatus, createdAt])
 }
 
 model EsgScorecard {
@@ -1240,10 +1273,14 @@ model EsgScorecard {
   evidenceJson         Json?
   pricingAdjustmentBps Decimal  @default(0)
   status               String   @default("ACTIVE")
+  counterparty         Counterparty @relation(fields: [counterpartyId], references: [id])
+  programme            Programme? @relation(fields: [programmeId], references: [id])
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
   @@index([counterpartyId])
+  @@index([programmeId])
+  @@index([status, asOfDate])
 }
 
 model IntegrationConnection {
@@ -1356,10 +1393,17 @@ model AiAnomalySignal {
   status         String   @default("OPEN")
   reviewedByUserId String?
   reviewedAt     DateTime?
+  invoice        Invoice? @relation(fields: [invoiceId], references: [id])
+  payment        Payment? @relation(fields: [paymentId], references: [id])
+  counterparty   Counterparty? @relation(fields: [counterpartyId], references: [id])
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   @@index([status])
+  @@index([severity, status])
+  @@index([invoiceId])
+  @@index([paymentId])
+  @@index([counterpartyId])
 }
 
 model InvestorReportSnapshot {
@@ -1379,10 +1423,14 @@ model InvestorReportSnapshot {
   reportJson               Json?
   status                   String   @default("GENERATED")
   generatedAt              DateTime @default(now())
+  investorRecord           InvestorRecord? @relation(fields: [investorRecordId], references: [id])
+  counterparty             Counterparty? @relation(fields: [counterpartyId], references: [id])
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
   @@index([reportType])
+  @@index([counterpartyId])
+  @@index([status, generatedAt])
 }
 
 model AuditLog {

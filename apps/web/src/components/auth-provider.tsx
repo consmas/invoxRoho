@@ -37,8 +37,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(async () => {
-      const storedToken = window.localStorage.getItem(TOKEN_KEY);
-      const storedUser = window.localStorage.getItem(USER_KEY);
+      migrateLegacyLocalAuth();
+      const storedToken = window.sessionStorage.getItem(TOKEN_KEY);
+      const storedUser = window.sessionStorage.getItem(USER_KEY);
       if (storedToken) {
         setToken(storedToken);
         setAuthToken(storedToken);
@@ -47,19 +48,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           setUser(JSON.parse(storedUser) as AuthUser);
         } catch {
-          window.localStorage.removeItem(USER_KEY);
+          window.sessionStorage.removeItem(USER_KEY);
         }
       }
       if (storedToken) {
         try {
           const currentUser = (await getMe()) as AuthUser;
           if (!cancelled) {
-            window.localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+            window.sessionStorage.setItem(USER_KEY, JSON.stringify(currentUser));
             setUser(currentUser);
           }
         } catch {
-          window.localStorage.removeItem(TOKEN_KEY);
-          window.localStorage.removeItem(USER_KEY);
+          window.sessionStorage.removeItem(TOKEN_KEY);
+          window.sessionStorage.removeItem(USER_KEY);
           setAuthToken(null);
           if (!cancelled) {
             setToken(null);
@@ -79,16 +80,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const response = await loginRequest({ email, password });
-    window.localStorage.setItem(TOKEN_KEY, response.accessToken);
-    window.localStorage.setItem(USER_KEY, JSON.stringify(response.user));
+    window.sessionStorage.setItem(TOKEN_KEY, response.accessToken);
+    window.sessionStorage.setItem(USER_KEY, JSON.stringify(response.user));
     setAuthToken(response.accessToken);
     setToken(response.accessToken);
     setUser(response.user);
   }, []);
 
   const logout = useCallback(() => {
-    window.localStorage.removeItem(TOKEN_KEY);
-    window.localStorage.removeItem(USER_KEY);
+    window.sessionStorage.removeItem(TOKEN_KEY);
+    window.sessionStorage.removeItem(USER_KEY);
     setAuthToken(null);
     setToken(null);
     setUser(null);
@@ -110,6 +111,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+function migrateLegacyLocalAuth() {
+  window.localStorage.removeItem(TOKEN_KEY);
+  window.localStorage.removeItem(USER_KEY);
 }
 
 function hasPermission(permissions: string[], permission: PermissionKey | string) {

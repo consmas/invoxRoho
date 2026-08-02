@@ -8,7 +8,7 @@ export function createPaymentProvider(config: ConfigService): PaymentProvider {
   const provider = config.get<string>('PAYMENT_PROVIDER') ?? 'sandbox';
   if (mode === 'live' || provider !== 'sandbox') {
     throw new BadRequestException(
-      'Live payment providers are disabled in Stage 8D; use sandbox.',
+      'Live payment providers are disabled; use sandbox.',
     );
   }
   return new SandboxPaymentProvider(config);
