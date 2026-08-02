@@ -70,7 +70,7 @@ services:
       WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:?Set WEBHOOK_SIGNING_SECRET in .env}
       CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env}
       APP_URL: ${APP_URL:?Set APP_URL in .env}
-    command: sh -c "npx prisma migrate deploy && node dist/main.js"
+    command: sh -c "npx prisma migrate deploy && node dist/src/main.js"
     ports:
       - "${API_PORT:-3001}:3001"
     volumes:
