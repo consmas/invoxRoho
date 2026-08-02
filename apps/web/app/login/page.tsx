@@ -40,30 +40,41 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="grid min-h-screen bg-background text-foreground lg:grid-cols-[1fr_520px]">
-      <section className="hidden border-r border-border bg-sidebar p-10 lg:flex lg:flex-col lg:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <Landmark className="size-5" />
+    <main className="grid min-h-screen bg-background text-foreground lg:grid-cols-[minmax(0,1fr)_500px]">
+      <section className="hidden border-r border-sidebar-border bg-sidebar p-10 text-white lg:flex lg:flex-col lg:justify-between">
+        <div>
+          <div className="mb-4 inline-flex rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-200">
+            Staging
           </div>
-          <div>
-            <p className="font-semibold">INVOX</p>
-            <p className="text-sm text-muted-foreground">
-              Supply Chain Finance
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-md bg-white text-primary">
+              <Landmark className="size-5" />
+            </div>
+            <div>
+              <p className="font-semibold tracking-wide">INVOX</p>
+              <p className="text-sm text-white/55">Supply Chain Finance OS</p>
+            </div>
           </div>
         </div>
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Core Platform
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/40">
+            Reverse factoring operations
           </p>
           <h1 className="mt-3 max-w-xl text-4xl font-semibold tracking-tight">
-            Role-based access for approved payables finance operations.
+            Everything is a ledger entry with a face.
           </h1>
-          <p className="mt-4 max-w-lg text-muted-foreground">
-            Access is controlled by backend JWT permissions. The frontend only
-            shows actions the signed-in user is allowed to perform.
+          <p className="mt-4 max-w-lg text-sm leading-6 text-white/62">
+            Sign in to manage counterparties, programmes, invoices, financing,
+            payments, approvals and controls from one permission-aware workspace.
           </p>
+        </div>
+        <div className="grid grid-cols-3 gap-3 text-xs">
+          {["Who", "Amount", "Stage"].map((label) => (
+            <div key={label} className="rounded-md border border-white/10 bg-white/[0.04] p-3">
+              <p className="font-semibold text-white">{label}</p>
+              <p className="mt-1 text-white/45">Always visible</p>
+            </div>
+          ))}
         </div>
       </section>
 

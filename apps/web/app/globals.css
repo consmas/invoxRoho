@@ -27,30 +27,31 @@
 }
 
 :root {
-  --background: oklch(0.985 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
+  --background: #f6f7f9;
+  --foreground: #101828;
+  --card: #ffffff;
+  --card-foreground: #101828;
+  --primary: #1e3a8a;
+  --primary-foreground: #ffffff;
+  --muted: #f1f3f6;
+  --muted-foreground: #667085;
+  --border: #e2e5ea;
+  --input: #d8dde6;
+  --ring: #1e3a8a;
+  --destructive: #c4402b;
+  --sidebar: #0b1d3a;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #0b1d3a;
+  --sidebar-accent: rgb(255 255 255 / 0.08);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 0.1);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+  font-variant-numeric: tabular-nums;
 }
 
 button,
@@ -59,4 +60,13 @@ input,
 select,
 textarea {
   -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: rgb(30 58 138 / 0.16);
+  color: var(--foreground);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
