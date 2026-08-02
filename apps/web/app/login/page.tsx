@@ -25,7 +25,7 @@ export default function LoginPage() {
     resolver: zodResolver(schema),
     defaultValues: {
       email: "admin@invox.local",
-      password: "ChangeMe123!",
+      password: "Admin@123456",
     },
   });
 
@@ -105,7 +105,7 @@ export default function LoginPage() {
           </Button>
 
           <p className="mt-4 text-xs text-muted-foreground">
-            Local seed default: admin@invox.local / ChangeMe123!
+            Local seed default: admin@invox.local / Admin@123456
           </p>
         </form>
       </section>

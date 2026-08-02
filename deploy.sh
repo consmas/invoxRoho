@@ -42,6 +42,24 @@ if [ -n "$missing" ]; then
   exit 1
 fi
 
+storage_provider="$(grep -E '^[[:space:]]*STORAGE_PROVIDER=' .env | tail -n 1 | cut -d '=' -f 2- | tr -d '"' | tr -d "'")"
+if [ "$storage_provider" = "s3" ]; then
+  s3_missing=""
+  for key in S3_ENDPOINT S3_REGION S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY; do
+    if ! grep -Eq "^[[:space:]]*${key}=.+" .env; then
+      s3_missing="${s3_missing} ${key}"
+    fi
+  done
+  if [ -n "$s3_missing" ]; then
+    echo "ERROR: STORAGE_PROVIDER=s3 but .env is missing S3 values:" >&2
+    for key in $s3_missing; do
+      echo "  - $key" >&2
+    done
+    echo "Set STORAGE_PROVIDER=local for now, or add valid DigitalOcean Spaces credentials." >&2
+    exit 1
+  fi
+fi
+
 COMPOSE_FILE="docker-compose.yml"
 if [ ! -f "$COMPOSE_FILE" ]; then
   COMPOSE_FILE="compose.yml"
