@@ -1,5 +1,5 @@
-import { UserManagementPage } from "@/src/components/workflow-pages";
+import { RolesPage } from "@/src/components/workflow-pages";
 
 export default function Page() {
-  return <UserManagementPage />;
+  return <RolesPage />;
 }

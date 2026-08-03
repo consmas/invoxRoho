@@ -79,6 +79,7 @@ export const PERMISSIONS = {
   programmesCreate: "programmes:create",
   programmesUpdate: "programmes:update",
   programmesApprove: "programmes:approve",
+  programmesActivate: "programmes:activate",
   invoicesRead: "invoices:read",
   invoicesCreate: "invoices:create",
   invoicesUpdate: "invoices:update",

@@ -25,9 +25,9 @@ async function request(path, options = {}) {
 }
 
 async function main() {
-  const email = process.env.SMOKE_ADMIN_EMAIL ?? "admin@invox.local";
+  const email = process.env.SMOKE_ADMIN_EMAIL ?? "admin@invox.com";
   const passwords = [
-    process.env.SMOKE_ADMIN_PASSWORD ?? "Admin@12345",
+    process.env.SMOKE_ADMIN_PASSWORD ?? "Admin@123456",
     "Demo@12345",
   ];
   let login;

@@ -76,6 +76,8 @@ export const createProgramme = async (payload: unknown) =>
   (await api.post<Programme>("/programmes", payload)).data;
 export const updateProgramme = async (id: string, payload: unknown) =>
   (await api.patch<Programme>(`/programmes/${id}`, payload)).data;
+export const activateProgramme = async (id: string) =>
+  (await api.post<Programme>(`/programmes/${id}/activate`)).data;
 export const addProgrammeParticipant = async (
   programmeId: string,
   payload: unknown,

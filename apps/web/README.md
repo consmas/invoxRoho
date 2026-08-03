@@ -32,8 +32,8 @@ Then open [http://localhost:3000](http://localhost:3000).
 Default local login after seeding the API:
 
 ```txt
-admin@invox.local
-ChangeMe123!
+admin@invox.com
+Admin@123456
 ```
 
 Primary routes:

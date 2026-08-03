@@ -56,8 +56,8 @@ async function counterparty(type: 'ANCHOR' | 'SUPPLIER' | 'FUNDER', legalName: s
 
 async function main() {
   const admin =
-    (await prisma.user.findUnique({ where: { email: 'admin@invox.local' } })) ??
-    (await user('admin@invox.local', 'PLATFORM_ADMIN', 'Platform', 'Admin'));
+    (await prisma.user.findUnique({ where: { email: 'admin@invox.com' } })) ??
+    (await user('admin@invox.com', 'PLATFORM_ADMIN', 'Platform', 'Admin'));
   await user('relationship.manager@invox.local', 'RELATIONSHIP_MANAGER', 'Relationship', 'Manager');
   await user('compliance.officer@invox.local', 'COMPLIANCE_OFFICER', 'Compliance', 'Officer');
   await user('credit.risk@invox.local', 'CREDIT_RISK_OFFICER', 'Credit', 'Risk');

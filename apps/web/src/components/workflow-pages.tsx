@@ -10,6 +10,7 @@ import { z } from "zod";
 import {
   acceptFinancingOffer,
   addProgrammeParticipant,
+  activateProgramme,
   approveInvoice,
   collectFinancingTransaction,
   confirmBuyerApproval,
@@ -704,6 +705,37 @@ export function UserManagementPage() {
           ) : null}
         </Card>
       </div>
+    </AppShell>
+  );
+}
+
+export function RolesPage() {
+  const query = useQuery({ queryKey: ["roles"], queryFn: getRoles });
+  const rows = query.data ?? [];
+
+  return (
+    <AppShell>
+      <PageHeader
+        title="Roles"
+        description="Configured role templates and their permission coverage."
+      />
+      <StatusMessage
+        loading={query.isLoading}
+        error={query.isError ? getApiError(query.error) : undefined}
+        empty={rows.length === 0 ? "No roles configured." : undefined}
+      />
+      {rows.length ? (
+        <DataTable headers={["Role", "Description", "Permissions", "Updated"]}>
+          {rows.map((role) => (
+            <tr key={role.id}>
+              <td className="px-4 py-3 font-medium">{formatRoleName(role.name)}</td>
+              <td className="px-4 py-3">{role.description ?? "-"}</td>
+              <td className="px-4 py-3">{role.permissions.length}</td>
+              <td className="px-4 py-3">{formatDate(role.updatedAt)}</td>
+            </tr>
+          ))}
+        </DataTable>
+      ) : null}
     </AppShell>
   );
 }
@@ -1446,15 +1478,39 @@ export function ProgrammeDetailPage({ id }: { id: string }) {
       await queryClient.invalidateQueries({ queryKey: ["programmes"] });
     },
   });
+  const activate = useMutation({
+    mutationFn: () => activateProgramme(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["programme", id] });
+      await queryClient.invalidateQueries({ queryKey: ["programmes"] });
+    },
+  });
   const suppliers = counterparties.data?.filter((item) => item.type === "SUPPLIER") ?? [];
   const funders = counterparties.data?.filter((item) => item.type === "FUNDER") ?? [];
 
   return (
     <AppShell>
-      <PageHeader title="Programme Detail" action={<LinkButton href="/programmes">Back</LinkButton>} />
+      <PageHeader
+        title="Programme Detail"
+        action={
+          <div className="flex flex-wrap gap-2">
+            <PermissionGate permission={PERMISSIONS.programmesActivate}>
+              <Button
+                variant="brass"
+                disabled={programme.data?.status === "ACTIVE" || activate.isPending}
+                onClick={() => activate.mutate()}
+              >
+                {activate.isPending ? "Activating..." : "Activate"}
+              </Button>
+            </PermissionGate>
+            <LinkButton href="/programmes">Back</LinkButton>
+          </div>
+        }
+      />
       <DetailState query={programme}>
         {(row) => (
           <div className="grid gap-6">
+            {activate.isError ? <ErrorText error={activate.error} /> : null}
             <DetailsGrid
               rows={[
                 ["Name", row.name],

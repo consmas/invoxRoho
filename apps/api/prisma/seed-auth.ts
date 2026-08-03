@@ -506,7 +506,7 @@ async function main() {
     await syncRolePermissions(role.id, definition.permissions);
   }
 
-  const email = process.env.SEED_ADMIN_EMAIL ?? 'admin@invox.local';
+  const email = process.env.SEED_ADMIN_EMAIL ?? 'admin@invox.com';
   const password = process.env.SEED_ADMIN_PASSWORD ?? 'Admin@123456';
   const passwordHash = await bcrypt.hash(password, 12);
   const adminRole = await prisma.role.findUniqueOrThrow({

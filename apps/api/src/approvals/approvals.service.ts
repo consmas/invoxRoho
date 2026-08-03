@@ -98,7 +98,7 @@ export class ApprovalsService {
       throw new ForbiddenException('Requester cannot approve own request');
     }
 
-    const result = await this.executeApproval(approval);
+    const result = await this.executeApproval(approval, user);
     const updated = await this.prisma.approvalRequest.update({
       where: { id },
       data: {
@@ -194,6 +194,7 @@ export class ApprovalsService {
 
   private executeApproval(
     approval: Awaited<ReturnType<ApprovalsService['findOne']>>,
+    user: AuthenticatedUser,
   ) {
     switch (approval.action) {
       case 'KYC_APPROVAL':
@@ -262,6 +263,15 @@ export class ApprovalsService {
             verificationStatus: VerificationStatus.VERIFIED,
             isVerified: true,
             verifiedAt: new Date(),
+          },
+        });
+      case 'PAYMENT_APPROVAL':
+      case 'APPROVE_PAYMENT':
+        return this.prisma.payment.update({
+          where: { id: approval.entityId },
+          data: {
+            approvedById: user.id,
+            approvedAt: new Date(),
           },
         });
       default:

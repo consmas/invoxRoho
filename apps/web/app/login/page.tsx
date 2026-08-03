@@ -24,7 +24,7 @@ export default function LoginPage() {
   const form = useForm<LoginForm>({
     resolver: zodResolver(schema),
     defaultValues: {
-      email: "admin@invox.local",
+      email: "admin@invox.com",
       password: "Admin@123456",
     },
   });
@@ -116,7 +116,7 @@ export default function LoginPage() {
           </Button>
 
           <p className="mt-4 text-xs text-muted-foreground">
-            Local seed default: admin@invox.local / Admin@123456
+            Seeded admin default: admin@invox.com / Admin@123456
           </p>
         </form>
       </section>

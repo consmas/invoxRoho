@@ -123,8 +123,39 @@ export class PaymentsService {
       { metadata: { submittedForApprovalAt: new Date().toISOString() } },
       actorUserId,
     );
+    const approval = await this.prisma.approvalRequest.findFirst({
+      where: {
+        entityType: 'Payment',
+        entityId: id,
+        action: 'PAYMENT_APPROVAL',
+        status: 'PENDING',
+      },
+    }) ?? await this.prisma.approvalRequest.create({
+      data: {
+        entityType: 'Payment',
+        entityId: id,
+        action: 'PAYMENT_APPROVAL',
+        requestedById: actorUserId ?? 'system',
+        requestPayload: {
+          amount: row.amount.toString(),
+          currency: row.currency,
+          direction: row.direction,
+          reference: row.reference,
+          counterpartyId: row.counterpartyId,
+          provider: row.provider,
+        },
+      },
+    });
+    await this.audit.log({
+      actorUserId,
+      action: AuditAction.CREATE,
+      entityType: 'ApprovalRequest',
+      entityId: approval.id,
+      afterJson: approval,
+      reason: `Requested payment approval for Payment:${id}`,
+    });
     await this.notify('payment submitted for approval', row);
-    return row;
+    return { payment: row, approval };
   }
 
   async approve(id: string, actorUserId?: string) {

@@ -174,7 +174,8 @@ export function NotificationsPage() {
       createNotification({
         ...notificationForm,
         recipient: notificationForm.recipient || selectedRecipient?.sublabel || selectedRecipient?.label,
-        metadata: selectedRecipient
+        counterpartyId: selectedRecipient?.type === "Counterparty" ? selectedRecipient.id : undefined,
+        payloadJson: selectedRecipient
           ? { recipientEntityId: selectedRecipient.id, recipientEntityType: selectedRecipient.type }
           : undefined,
       }),
@@ -394,7 +395,9 @@ export function WebhookEndpointsPage({ createMode = false }: { createMode?: bool
         name: form.name,
         url: form.url,
         events: form.events,
-        payloadTemplate: JSON.parse(form.payloadTemplate || "{}") as AnyRecord,
+        secret: advancedOpen
+          ? String((JSON.parse(form.payloadTemplate || "{}") as AnyRecord).secret ?? "")
+          : undefined,
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["webhook-endpoints"] }),
   });
@@ -499,10 +502,33 @@ function DetailShell({ title, back, query, children }: { title: string; back: st
       {query.data ? (
         <Card>
           {children}
-          <pre className="mt-4 overflow-auto rounded-md bg-slate-950 p-4 text-xs text-slate-50">{JSON.stringify(query.data, null, 2)}</pre>
+          <KeyValueGrid row={query.data as AnyRecord} />
+          <details className="mt-4 rounded-md border border-border">
+            <summary className="cursor-pointer px-3 py-2 text-sm font-semibold">
+              Raw response
+            </summary>
+            <pre className="overflow-auto border-t border-border bg-slate-950 p-4 text-xs text-slate-50">{JSON.stringify(query.data, null, 2)}</pre>
+          </details>
         </Card>
       ) : null}
     </AppShell>
+  );
+}
+
+function KeyValueGrid({ row }: { row: AnyRecord }) {
+  const entries = Object.entries(row).filter(([, value]) => {
+    if (value === null || value === undefined) return true;
+    return typeof value !== "object";
+  });
+  return (
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {entries.map(([key, value]) => (
+        <div key={key} className="rounded-md border border-border p-3">
+          <p className="text-xs font-medium uppercase text-muted-foreground">{key}</p>
+          <p className="mt-1 break-words text-sm">{formatValue(value)}</p>
+        </div>
+      ))}
+    </div>
   );
 }
 

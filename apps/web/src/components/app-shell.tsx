@@ -830,6 +830,7 @@ export function DataTable({
   headers: string[];
   children: React.ReactNode;
 }) {
+  const hasActionsColumn = headers.at(-1)?.toLowerCase() === "actions";
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
       <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
@@ -846,14 +847,27 @@ export function DataTable({
         <table className="min-w-full divide-y divide-border text-[13px]">
           <thead className="bg-muted text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             <tr>
-              {headers.map((header) => (
-                <th key={header} className="whitespace-nowrap px-4 py-3">
+              {headers.map((header, index) => (
+                <th
+                  key={header}
+                  className={`whitespace-nowrap px-4 py-3 ${
+                    hasActionsColumn && index === headers.length - 1
+                      ? "sticky right-0 z-10 border-l border-border bg-muted"
+                      : ""
+                  }`}
+                >
                   {header}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-border bg-card [&_td]:px-4 [&_td]:py-3 [&_td]:align-top [&_td]:text-sm [&_tr:hover]:bg-muted/45">
+          <tbody
+            className={`divide-y divide-border bg-card [&_td]:px-4 [&_td]:py-3 [&_td]:align-top [&_td]:text-sm [&_tr:hover]:bg-muted/45 ${
+              hasActionsColumn
+                ? "[&_td:last-child]:sticky [&_td:last-child]:right-0 [&_td:last-child]:z-10 [&_td:last-child]:border-l [&_td:last-child]:border-border [&_td:last-child]:bg-card [&_tr:hover_td:last-child]:bg-muted"
+                : ""
+            }`}
+          >
             {children}
           </tbody>
         </table>
