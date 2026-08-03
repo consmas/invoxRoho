@@ -88,7 +88,7 @@ export function InvoiceImportPage() {
     onSuccess,
   });
   const erp = useMutation({
-    mutationFn: () => importInvoicesFromErp({ programmeId, programmeCode, anchorId }),
+    mutationFn: () => importInvoicesFromErp(cleanContext({ programmeId, programmeCode, anchorId })),
     onSuccess,
   });
   const anchors = counterparties.data?.filter((row) => row.type === "ANCHOR") ?? [];
@@ -335,6 +335,12 @@ function importFile(
   if (context.programmeCode) formData.set("programmeCode", context.programmeCode);
   if (context.anchorId) formData.set("anchorId", context.anchorId);
   return importer(formData);
+}
+
+function cleanContext(context: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(context).filter(([, value]) => value.trim().length > 0),
+  );
 }
 
 function downloadSampleCsv() {

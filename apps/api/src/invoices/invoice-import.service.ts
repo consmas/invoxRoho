@@ -208,13 +208,18 @@ export class InvoiceImportService {
     params: InvoiceImportContext & { fromDate?: string; toDate?: string },
     actorUserId?: string,
   ) {
+    const cleanParams = {
+      ...this.normalizeContext(params),
+      fromDate: text(params.fromDate),
+      toDate: text(params.toDate),
+    };
     const started = Date.now();
     try {
-      const result = await this.erp.importInvoices(params);
+      const result = await this.erp.importInvoices(cleanParams);
       const batch = await this.createBatchFromRows(
         'ERP',
         result.invoices as unknown as Record<string, unknown>[],
-        { ...params, sourceReference: result.providerReference },
+        { ...cleanParams, sourceReference: result.providerReference },
         actorUserId,
       );
       await this.logs.create({
@@ -222,7 +227,7 @@ export class InvoiceImportService {
         providerKey: result.provider,
         direction: 'INBOUND',
         operation: 'erp.import_invoices',
-        requestJson: params,
+        requestJson: cleanParams,
         responseJson: result.rawResponse ?? result,
         entityType: 'InvoiceImportBatch',
         entityId: batch.id,
@@ -236,7 +241,7 @@ export class InvoiceImportService {
         providerKey: 'mock',
         direction: 'INBOUND',
         operation: 'erp.import_invoices',
-        requestJson: params,
+        requestJson: cleanParams,
         status: 'FAILED',
         errorMessage:
           error instanceof Error ? error.message : 'ERP import failed',
@@ -895,15 +900,16 @@ export class InvoiceImportService {
     context: InvoiceImportContext,
     actorUserId?: string,
   ) {
+    const cleanContext = this.normalizeContext(context);
     if (rawRows.length > this.maxRows) {
       throw new BadRequestException(`Import row count exceeds ${this.maxRows}`);
     }
     const batch = await this.prisma.invoiceImportBatch.create({
       data: {
         sourceType,
-        sourceReference: context.sourceReference,
-        programmeId: context.programmeId,
-        anchorId: context.anchorId,
+        sourceReference: cleanContext.sourceReference,
+        programmeId: cleanContext.programmeId,
+        anchorId: cleanContext.anchorId,
         uploadedById: actorUserId,
         status: 'PROCESSING',
         startedAt: new Date(),
@@ -914,7 +920,7 @@ export class InvoiceImportService {
     let invalidRows = 0;
     let duplicateRows = 0;
     for (const [index, raw] of rawRows.entries()) {
-      const normalized = this.normalizeRow(raw, context);
+      const normalized = this.normalizeRow(raw, cleanContext);
       const validation = await this.validateImportRow(normalized);
       if (validation.status === 'VALID') validRows += 1;
       if (validation.status === 'INVALID') invalidRows += 1;
@@ -1165,6 +1171,15 @@ export class InvoiceImportService {
       description: text(raw.description),
       buyerApproved: booleanValue(raw.buyerApproved),
       buyerApprovalReference: text(raw.buyerApprovalReference),
+    };
+  }
+
+  private normalizeContext(context: InvoiceImportContext): InvoiceImportContext {
+    return {
+      programmeId: text(context.programmeId),
+      programmeCode: text(context.programmeCode),
+      anchorId: text(context.anchorId),
+      sourceReference: text(context.sourceReference),
     };
   }
 

@@ -237,6 +237,31 @@ describe('Stage 8E invoice import and validation foundations', () => {
     );
   });
 
+  it('normalizes empty ERP import context fields before persistence', async () => {
+    const { prisma } = baseRows();
+    const { imports, erp } = service(prisma);
+
+    await imports.importFromErp({
+      programmeId: '',
+      programmeCode: 'RF-DEMO',
+      anchorId: '',
+    }, 'actor-1');
+
+    expect(erp.importInvoices).toHaveBeenCalledWith({
+      programmeCode: 'RF-DEMO',
+      fromDate: undefined,
+      toDate: undefined,
+    });
+    expect(prisma.invoiceImportBatch.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          programmeId: undefined,
+          anchorId: undefined,
+        }),
+      }),
+    );
+  });
+
   it('implements mock ERP empty, failure and approval rules', async () => {
     const provider = new MockErpProvider();
 
