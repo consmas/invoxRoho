@@ -72,6 +72,16 @@ export class ProgrammesService {
 
   async update(id: string, dto: UpdateProgrammeDto) {
     const before = await this.findOne(id);
+    if (dto.anchorId) {
+      const anchor = await this.prisma.counterparty.findUnique({
+        where: { id: dto.anchorId },
+      });
+      if (!anchor || anchor.type !== CounterpartyType.ANCHOR) {
+        throw new BadRequestException(
+          'anchorId must reference an anchor counterparty',
+        );
+      }
+    }
     const programme = await this.prisma.programme.update({
       where: { id },
       data: this.toProgrammeUpdateInput(dto),

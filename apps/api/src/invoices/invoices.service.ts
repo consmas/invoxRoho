@@ -129,6 +129,12 @@ export class InvoicesService {
 
   async update(id: string, dto: UpdateInvoiceDto) {
     const before = await this.findOne(id);
+    const relationIds = {
+      programmeId: dto.programmeId ?? before.programmeId,
+      buyerId: dto.buyerId ?? before.buyerId,
+      supplierId: dto.supplierId ?? before.supplierId,
+    };
+    await this.validateInvoiceRelations(relationIds);
     const invoice = await this.prisma.invoice.update({
       where: { id },
       data: {
@@ -155,6 +161,44 @@ export class InvoicesService {
       afterJson: invoice,
     });
     return invoice;
+  }
+
+  private async validateInvoiceRelations(dto: {
+    programmeId: string;
+    buyerId: string;
+    supplierId: string;
+  }) {
+    const [programme, buyer, supplier] = await Promise.all([
+      this.prisma.programme.findUnique({ where: { id: dto.programmeId } }),
+      this.prisma.counterparty.findUnique({ where: { id: dto.buyerId } }),
+      this.prisma.counterparty.findUnique({ where: { id: dto.supplierId } }),
+    ]);
+    if (!programme) {
+      throw new BadRequestException('programmeId is invalid');
+    }
+    if (!buyer || buyer.type !== CounterpartyType.ANCHOR) {
+      throw new BadRequestException('buyerId must reference an anchor');
+    }
+    if (!supplier || supplier.type !== CounterpartyType.SUPPLIER) {
+      throw new BadRequestException('supplierId must reference a supplier');
+    }
+    if (programme.anchorId !== buyer.id) {
+      throw new BadRequestException('buyerId must match the programme anchor');
+    }
+    const participant = await this.prisma.programmeParticipant.findUnique({
+      where: {
+        programmeId_counterpartyId_participantType: {
+          programmeId: dto.programmeId,
+          counterpartyId: dto.supplierId,
+          participantType: CounterpartyType.SUPPLIER,
+        },
+      },
+    });
+    if (!participant || !participant.isActive) {
+      throw new BadRequestException(
+        'supplierId must be an active supplier on the programme',
+      );
+    }
   }
 
   async approve(id: string) {

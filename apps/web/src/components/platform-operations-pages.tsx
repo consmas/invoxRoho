@@ -1,9 +1,9 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
-import { getAuditLogs } from "@/src/lib/api";
+import { createCounterparty, getAuditLogs } from "@/src/lib/api";
 import { getApiError } from "@/src/lib/api/client";
 import { formatDate } from "@/src/lib/format";
 import {
@@ -29,6 +29,7 @@ const workflowSteps = [
 ];
 
 export function OnboardingWorkspacePage() {
+  const queryClient = useQueryClient();
   const [form, setForm] = useState({
     counterpartyClass: "ANCHOR",
     legalName: "",
@@ -36,22 +37,38 @@ export function OnboardingWorkspacePage() {
     reviewTrack: "FULL_KYB_AML",
   });
   const [drafts, setDrafts] = useState<Row[]>([]);
+  const create = useMutation({
+    mutationFn: () =>
+      createCounterparty({
+        type: form.counterpartyClass,
+        legalName: form.legalName.trim(),
+        contactEmail: form.email.trim(),
+        country: "GH",
+        onboardingProgress: 10,
+        ownershipSummary: `Draft intake created from ${form.reviewTrack}`,
+      }),
+    onSuccess: async (row) => {
+      setDrafts((current) => [
+        {
+          id: row.id,
+          counterpartyClass: row.type,
+          legalName: row.legalName,
+          email: row.contactEmail,
+          reviewTrack: form.reviewTrack,
+          status: row.onboardingStatus ?? "DRAFT",
+        },
+        ...current,
+      ]);
+      setForm((current) => ({ ...current, legalName: "", email: "" }));
+      await queryClient.invalidateQueries({ queryKey: ["counterparties"] });
+    },
+  });
 
   const createDraft = () => {
     const legalName = form.legalName.trim();
     const email = form.email.trim();
     if (!legalName || !email) return;
-    setDrafts((current) => [
-      {
-        id: `INTAKE-${String(current.length + 1).padStart(3, "0")}`,
-        ...form,
-        legalName,
-        email,
-        status: "DRAFT",
-      },
-      ...current,
-    ]);
-    setForm((current) => ({ ...current, legalName: "", email: "" }));
+    create.mutate();
   };
 
   return (
@@ -121,11 +138,19 @@ export function OnboardingWorkspacePage() {
                 <option>INVESTOR_DILIGENCE</option>
               </select>
             </Field>
-            <Button type="button" onClick={createDraft} disabled={!form.legalName.trim() || !form.email.trim()}>
-              Create draft intake
+            <Button type="button" onClick={createDraft} disabled={!form.legalName.trim() || !form.email.trim() || create.isPending}>
+              {create.isPending ? "Creating..." : "Create draft intake"}
             </Button>
+            {!form.legalName.trim() || !form.email.trim() ? (
+              <p className="text-xs text-amber-700">
+                Enter a legal name and contact email to create a draft counterparty.
+              </p>
+            ) : null}
+            {create.isError ? (
+              <p className="text-sm text-destructive">{getApiError(create.error)}</p>
+            ) : null}
             <p className="text-xs text-muted-foreground">
-              Draft intakes should be promoted into counterparties once compliance evidence is complete.
+              This creates a real DRAFT counterparty record that can be completed from Counterparties.
             </p>
           </div>
         </Card>

@@ -7,10 +7,23 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
 } from 'class-validator';
 
 export class UpdateInvoiceDto {
+  @IsOptional()
+  @IsUUID()
+  programmeId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  buyerId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  supplierId?: string;
+
   @IsOptional()
   @IsString()
   invoiceNumber?: string;

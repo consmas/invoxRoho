@@ -558,6 +558,7 @@ function Badge({ children }: { children: React.ReactNode }) {
 }
 
 export function DashboardPage() {
+  const queryClient = useQueryClient();
   const health = useQuery({ queryKey: ["health"], queryFn: getHealth });
   const approvals = useQuery({ queryKey: ["approvals", "pending"], queryFn: getPendingApprovals });
   const { counterparties, programmes, invoices, financing } = useCoreData();
@@ -594,7 +595,29 @@ export function DashboardPage() {
       <PageHeader
         title="Dashboard"
         description="Operating snapshot from live backend endpoints."
-        action={<RefreshButton onClick={() => void health.refetch()} />}
+        action={<RefreshButton onClick={() => {
+          void health.refetch();
+          void queryClient.invalidateQueries({ queryKey: ["counterparties"] });
+          void queryClient.invalidateQueries({ queryKey: ["programmes"] });
+          void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+          void queryClient.invalidateQueries({ queryKey: ["financing"] });
+          void queryClient.invalidateQueries({ queryKey: ["approvals", "pending"] });
+        }} />}
+      />
+      <StatusMessage
+        error={
+          counterparties.isError
+            ? `Counterparties failed: ${getApiError(counterparties.error)}`
+            : programmes.isError
+              ? `Programmes failed: ${getApiError(programmes.error)}`
+              : invoices.isError
+                ? `Invoices failed: ${getApiError(invoices.error)}`
+                : financing.isError
+                  ? `Financing failed: ${getApiError(financing.error)}`
+                  : approvals.isError
+                    ? `Approvals failed: ${getApiError(approvals.error)}`
+                    : undefined
+        }
       />
       <div className="mb-6 rounded-lg border border-slate-200 bg-white p-5">
         <p className="text-sm text-slate-500">API health</p>
@@ -1496,6 +1519,7 @@ export function ProgrammeDetailPage({ id }: { id: string }) {
           <div className="flex flex-wrap gap-2">
             <PermissionGate permission={PERMISSIONS.programmesActivate}>
               <Button
+                type="button"
                 variant="brass"
                 disabled={programme.data?.status === "ACTIVE" || activate.isPending}
                 onClick={() => activate.mutate()}
@@ -1507,6 +1531,12 @@ export function ProgrammeDetailPage({ id }: { id: string }) {
           </div>
         }
       />
+      {activate.isError ? <ErrorText error={activate.error} /> : null}
+      {activate.isSuccess ? (
+        <p className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+          Programme activated.
+        </p>
+      ) : null}
       <DetailState query={programme}>
         {(row) => (
           <div className="grid gap-6">
@@ -1790,7 +1820,12 @@ export function InvoiceDetailPage({ id }: { id: string }) {
   });
   const offer = useMutation({
     mutationFn: generateFinancingOfferFromInvoice,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["invoice", id] }),
+    onSuccess: async (row) => {
+      await queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      await queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      await queryClient.invalidateQueries({ queryKey: ["financing"] });
+      router.push(`/financing/${row.id}`);
+    },
   });
   const confirmApproval = useMutation({
     mutationFn: () => confirmBuyerApproval(id, { source: "manual" }),

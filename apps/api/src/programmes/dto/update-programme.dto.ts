@@ -8,6 +8,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
 } from 'class-validator';
 import {
@@ -35,6 +36,10 @@ export class UpdateProgrammeDto {
   @IsOptional()
   @IsEnum(ProgrammeMode)
   mode?: ProgrammeMode;
+
+  @IsOptional()
+  @IsUUID()
+  anchorId?: string;
 
   @IsOptional()
   @IsString()
