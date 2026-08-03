@@ -1,5 +1,5 @@
-import { Phase2ResourcePage } from "@/src/components/phase2-product-pages";
+import { ProductResourcePage } from "@/src/components/product-pages";
 
 export default function Page() {
-  return <Phase2ResourcePage resource="ai-anomaly-signals" />;
+  return <ProductResourcePage resource="ai-anomaly-signals" />;
 }

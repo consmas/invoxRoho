@@ -13,9 +13,9 @@ import type {
   OperationsDashboard,
   Payment,
   PaymentWebhookEvent,
-  Phase2Dashboard,
-  Phase2Record,
-  Phase2Resource,
+  ProductDashboard,
+  ProductRecord,
+  ProductResource,
   ProviderCallbackReconciliation,
   ProviderWebhookEvent,
   Programme,
@@ -209,14 +209,14 @@ export const updateOperationRecord = async (
   data: Record<string, unknown>,
 ) => (await api.patch(`/operations/${resource}/${id}`, { data })).data;
 
-export const getPhase2Dashboard = async () =>
-  (await api.get<Phase2Dashboard>("/products/dashboard")).data;
-export const getPhase2Records = async (resource: Phase2Resource) =>
-  (await api.get<Phase2Record[]>(`/products/${resource}`)).data;
-export const getPhase2Record = async (resource: Phase2Resource, id: string) =>
-  (await api.get<Phase2Record>(`/products/${resource}/${id}`)).data;
-export const calculatePhase2Record = async (
-  resource: Phase2Resource,
+export const getProductDashboard = async () =>
+  (await api.get<ProductDashboard>("/products/dashboard")).data;
+export const getProductRecords = async (resource: ProductResource) =>
+  (await api.get<ProductRecord[]>(`/products/${resource}`)).data;
+export const getProductRecord = async (resource: ProductResource, id: string) =>
+  (await api.get<ProductRecord>(`/products/${resource}/${id}`)).data;
+export const calculateProductRecord = async (
+  resource: ProductResource,
   data: Record<string, unknown>,
 ) =>
   (
@@ -225,32 +225,32 @@ export const calculatePhase2Record = async (
       data,
     )
   ).data;
-export const createPhase2Record = async (
-  resource: Phase2Resource,
+export const createProductRecord = async (
+  resource: ProductResource,
   data: Record<string, unknown>,
-) => (await api.post<Phase2Record>(`/products/${resource}`, { data })).data;
-export const updatePhase2Record = async (
-  resource: Phase2Resource,
+) => (await api.post<ProductRecord>(`/products/${resource}`, { data })).data;
+export const updateProductRecord = async (
+  resource: ProductResource,
   id: string,
   data: Record<string, unknown>,
-) => (await api.patch<Phase2Record>(`/products/${resource}/${id}`, { data })).data;
-export const deletePhase2Record = async (resource: Phase2Resource, id: string) =>
-  (await api.delete<Phase2Record>(`/products/${resource}/${id}`)).data;
-export const runPhase2Action = async (
-  resource: Phase2Resource,
+) => (await api.patch<ProductRecord>(`/products/${resource}/${id}`, { data })).data;
+export const deleteProductRecord = async (resource: ProductResource, id: string) =>
+  (await api.delete<ProductRecord>(`/products/${resource}/${id}`)).data;
+export const runProductAction = async (
+  resource: ProductResource,
   id: string,
   action: string,
   payload: Record<string, unknown> = {},
   idempotencyKey?: string,
 ) =>
   (
-    await api.post<Phase2Record>(
+    await api.post<ProductRecord>(
       `/products/${resource}/${id}/actions/${action}`,
       payload,
       idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : undefined,
     )
   ).data;
-export const exportPhase2Csv = async (resource: Phase2Resource) =>
+export const exportProductCsv = async (resource: ProductResource) =>
   (
     await api.get(`/products/${resource}/export/csv`, {
       responseType: "blob",

@@ -1,6 +1,6 @@
 import { IsObject } from 'class-validator';
 
-export class Phase2RecordDto {
+export class ProductRecordDto {
   @IsObject()
   data: Record<string, unknown>;
 }

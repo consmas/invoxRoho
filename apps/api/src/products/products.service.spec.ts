@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { Phase2ProductsService } from './phase2-products.service';
+import { ProductsService } from './products.service';
 
 function buildService() {
   const rows = {
@@ -77,7 +77,7 @@ function buildService() {
       aggregate,
       findMany: jest.fn().mockResolvedValue([]),
       findUniqueOrThrow: jest.fn(),
-      create: jest.fn(),
+      create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'snapshot-1', ...data })),
       update: jest.fn(),
       delete: jest.fn(),
     },
@@ -112,13 +112,13 @@ function buildService() {
   };
   const audit = { log: jest.fn().mockResolvedValue({ id: 'audit-1' }) };
   return {
-    service: new Phase2ProductsService(prisma as never, audit as never),
+    service: new ProductsService(prisma as never, audit as never),
     prisma,
     audit,
   };
 }
 
-describe('Phase2ProductsService', () => {
+describe('ProductsService', () => {
   it('returns product dashboard metrics and totals', async () => {
     const { service } = buildService();
 
@@ -167,6 +167,57 @@ describe('Phase2ProductsService', () => {
         entityId: 'offer-1',
       }),
     );
+  });
+
+  it('creates investor report snapshots and parses JSON text fields', async () => {
+    const { service, prisma } = buildService();
+
+    const record = await service.create(
+      'investor-report-snapshots',
+      {
+        counterpartyId: '',
+        reportType: 'MONTHLY_NAV',
+        periodStart: '2026-08-01T00:00:00.000Z',
+        periodEnd: '2026-08-31T00:00:00.000Z',
+        navAmount: 1000,
+        committedCapital: 1500,
+        drawnCapital: 900,
+        distributedCapital: 50,
+        grossYield: 0.12,
+        delinquencyRate: 0.01,
+        weightedAverageLifeDays: 45,
+        reportJson: '{"nav":1000,"currency":"GHS"}',
+        status: 'GENERATED',
+        generatedAt: '2026-08-31T12:00:00.000Z',
+      },
+      'user-1',
+    );
+
+    expect(record).toHaveProperty('id', 'snapshot-1');
+    expect(prisma.investorReportSnapshot.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportJson: { nav: 1000, currency: 'GHS' },
+          periodStart: expect.any(Date),
+          generatedAt: expect.any(Date),
+        }),
+      }),
+    );
+  });
+
+  it('rejects invalid product JSON fields with a validation error', async () => {
+    const { service, prisma } = buildService();
+
+    await expect(
+      service.create('investor-report-snapshots', {
+        reportType: 'MONTHLY_NAV',
+        periodStart: '2026-08-01T00:00:00.000Z',
+        periodEnd: '2026-08-31T00:00:00.000Z',
+        reportJson: '{not-json',
+        status: 'GENERATED',
+      }),
+    ).rejects.toThrow('reportJson must contain valid JSON');
+    expect(prisma.investorReportSnapshot.create).not.toHaveBeenCalled();
   });
 
   it('updates and deletes supported resources with audit logs', async () => {

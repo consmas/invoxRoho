@@ -4,23 +4,23 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
-  createPhase2Record,
-  calculatePhase2Record,
-  deletePhase2Record,
+  createProductRecord,
+  calculateProductRecord,
+  deleteProductRecord,
   getAuditLogs,
   getCounterparties,
   getFinancingTransactions,
   getInvoices,
   getPayments,
-  getPhase2Dashboard,
-  getPhase2Records,
-  getPhase2Record,
+  getProductDashboard,
+  getProductRecords,
+  getProductRecord,
   getProgrammes,
-  runPhase2Action,
-  updatePhase2Record,
+  runProductAction,
+  updateProductRecord,
 } from "@/src/lib/api";
 import { getApiError } from "@/src/lib/api/client";
-import type { Phase2Record, Phase2Resource } from "@/src/lib/api/types";
+import type { ProductRecord, ProductResource } from "@/src/lib/api/types";
 import { formatDate, formatMoney } from "@/src/lib/format";
 import { PERMISSIONS } from "@/src/lib/permissions";
 import {
@@ -48,7 +48,7 @@ type FieldConfig = {
 };
 
 type ResourceConfig = {
-  resource: Phase2Resource;
+  resource: ProductResource;
   title: string;
   description: string;
   path: string;
@@ -345,8 +345,8 @@ const configs: ResourceConfig[] = [
   },
 ];
 
-export function Phase2OverviewPage() {
-  const dashboard = useQuery({ queryKey: ["phase2-dashboard"], queryFn: getPhase2Dashboard });
+export function ProductOverviewPage() {
+  const dashboard = useQuery({ queryKey: ["products-dashboard"], queryFn: getProductDashboard });
   const metrics = dashboard.data
     ? [
         ["Open DD offers", dashboard.data.openDynamicDiscountingOffers],
@@ -397,12 +397,12 @@ export function Phase2OverviewPage() {
   );
 }
 
-export function Phase2ResourcePage({ resource }: { resource: Phase2Resource }) {
+export function ProductResourcePage({ resource }: { resource: ProductResource }) {
   const config = getConfig(resource);
   const queryClient = useQueryClient();
   const records = useQuery({
-    queryKey: ["phase2", resource],
-    queryFn: () => getPhase2Records(resource),
+    queryKey: ["products", resource],
+    queryFn: () => getProductRecords(resource),
   });
   const counterparties = useQuery({ queryKey: ["counterparties"], queryFn: getCounterparties });
   const programmes = useQuery({ queryKey: ["programmes"], queryFn: getProgrammes });
@@ -415,11 +415,11 @@ export function Phase2ResourcePage({ resource }: { resource: Phase2Resource }) {
   const [filter, setFilter] = useState("");
 
   const invalidate = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["phase2", resource] });
-    await queryClient.invalidateQueries({ queryKey: ["phase2-dashboard"] });
+    await queryClient.invalidateQueries({ queryKey: ["products", resource] });
+    await queryClient.invalidateQueries({ queryKey: ["products-dashboard"] });
   };
   const create = useMutation({
-    mutationFn: () => createPhase2Record(resource, toPayload(config, form)),
+    mutationFn: () => createProductRecord(resource, toPayload(config, form)),
     onSuccess: async () => {
       setForm(config.defaults);
       setEditingId("");
@@ -427,7 +427,7 @@ export function Phase2ResourcePage({ resource }: { resource: Phase2Resource }) {
     },
   });
   const update = useMutation({
-    mutationFn: () => updatePhase2Record(resource, editingId, toPayload(config, form)),
+    mutationFn: () => updateProductRecord(resource, editingId, toPayload(config, form)),
     onSuccess: async () => {
       setForm(config.defaults);
       setEditingId("");
@@ -435,16 +435,16 @@ export function Phase2ResourcePage({ resource }: { resource: Phase2Resource }) {
     },
   });
   const remove = useMutation({
-    mutationFn: (id: string) => deletePhase2Record(resource, id),
+    mutationFn: (id: string) => deleteProductRecord(resource, id),
     onSuccess: invalidate,
   });
   const lifecycle = useMutation({
     mutationFn: ({ id, action }: { id: string; action: string }) =>
-      runPhase2Action(resource, id, action),
+      runProductAction(resource, id, action),
     onSuccess: invalidate,
   });
   const calculate = useMutation({
-    mutationFn: () => calculatePhase2Record(resource, toPayload(config, form)),
+    mutationFn: () => calculateProductRecord(resource, toPayload(config, form)),
     onSuccess: (result) => setForm((current) => ({ ...current, ...result })),
   });
   const rows = useMemo(() => {
@@ -582,32 +582,32 @@ export function Phase2ResourcePage({ resource }: { resource: Phase2Resource }) {
   );
 }
 
-export function Phase2RecordDetailPage({
+export function ProductRecordDetailPage({
   resource,
   id,
 }: {
-  resource: Phase2Resource;
+  resource: ProductResource;
   id: string;
 }) {
   const config = getConfig(resource);
   const queryClient = useQueryClient();
   const query = useQuery({
-    queryKey: ["phase2", resource, id],
-    queryFn: () => getPhase2Record(resource, id),
+    queryKey: ["products", resource, id],
+    queryFn: () => getProductRecord(resource, id),
   });
   const audits = useQuery({ queryKey: ["audit"], queryFn: getAuditLogs });
   const lifecycle = useMutation({
     mutationFn: (action: string) =>
-      runPhase2Action(resource, id, action, {}, `ui-${resource}-${id}-${action}`),
+      runProductAction(resource, id, action, {}, `ui-${resource}-${id}-${action}`),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["phase2", resource, id] });
+      await queryClient.invalidateQueries({ queryKey: ["products", resource, id] });
       await queryClient.invalidateQueries({ queryKey: ["audit"] });
     },
   });
   const timeline = useMemo(() => {
     return (audits.data ?? []).filter((row) => {
       const log = row as { entityType?: string; entityId?: string };
-      return ["Product:", "Phase2:"].some((prefix) => log.entityType === `${prefix}${resource}`) && log.entityId === id;
+      return ["Product:", "Product:"].some((prefix) => log.entityType === `${prefix}${resource}`) && log.entityId === id;
     });
   }, [audits.data, id, resource]);
 
@@ -781,7 +781,7 @@ function toPayload(config: ResourceConfig, form: Record<string, unknown>) {
   return payload;
 }
 
-function fromRecord(config: ResourceConfig, record: Phase2Record) {
+function fromRecord(config: ResourceConfig, record: ProductRecord) {
   const data: Record<string, unknown> = {};
   for (const field of config.fields) {
     const value = (record as unknown as Record<string, unknown>)[field.key];
@@ -792,7 +792,7 @@ function fromRecord(config: ResourceConfig, record: Phase2Record) {
   return data;
 }
 
-function formatCell(row: Phase2Record, key: string, format?: "money" | "date" | "badge") {
+function formatCell(row: ProductRecord, key: string, format?: "money" | "date" | "badge") {
   const value = (row as unknown as Record<string, unknown>)[key];
   if (value === null || value === undefined || value === "") return "-";
   if (format === "money") return formatMoney(value as string | number, "currency" in row ? row.currency : "GHS");
@@ -814,7 +814,7 @@ function ErrorText({ error }: { error: unknown }) {
   return <p className="mt-3 text-sm text-destructive">{getApiError(error)}</p>;
 }
 
-function getConfig(resource: Phase2Resource) {
+function getConfig(resource: ProductResource) {
   return configs.find((config) => config.resource === resource) ?? configs[0];
 }
 

@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useState } from "react";
 import { getAuditLogs } from "@/src/lib/api";
 import { getApiError } from "@/src/lib/api/client";
 import { formatDate } from "@/src/lib/format";
@@ -28,6 +29,31 @@ const workflowSteps = [
 ];
 
 export function OnboardingWorkspacePage() {
+  const [form, setForm] = useState({
+    counterpartyClass: "ANCHOR",
+    legalName: "",
+    email: "",
+    reviewTrack: "FULL_KYB_AML",
+  });
+  const [drafts, setDrafts] = useState<Row[]>([]);
+
+  const createDraft = () => {
+    const legalName = form.legalName.trim();
+    const email = form.email.trim();
+    if (!legalName || !email) return;
+    setDrafts((current) => [
+      {
+        id: `INTAKE-${String(current.length + 1).padStart(3, "0")}`,
+        ...form,
+        legalName,
+        email,
+        status: "DRAFT",
+      },
+      ...current,
+    ]);
+    setForm((current) => ({ ...current, legalName: "", email: "" }));
+  };
+
   return (
     <AppShell>
       <PageHeader
@@ -55,7 +81,11 @@ export function OnboardingWorkspacePage() {
           <h3 className="text-lg font-semibold">Start onboarding request</h3>
           <div className="mt-4 space-y-4">
             <Field label="Counterparty class">
-              <select className={inputClass} defaultValue="ANCHOR">
+              <select
+                className={inputClass}
+                value={form.counterpartyClass}
+                onChange={(event) => setForm((current) => ({ ...current, counterpartyClass: event.target.value }))}
+              >
                 <option>ANCHOR</option>
                 <option>SUPPLIER</option>
                 <option>FUNDER</option>
@@ -63,31 +93,66 @@ export function OnboardingWorkspacePage() {
               </select>
             </Field>
             <Field label="Legal name">
-              <input className={inputClass} placeholder="Registered business name" />
+              <input
+                className={inputClass}
+                placeholder="Registered business name"
+                value={form.legalName}
+                onChange={(event) => setForm((current) => ({ ...current, legalName: event.target.value }))}
+              />
             </Field>
             <Field label="Primary contact email">
-              <input className={inputClass} type="email" placeholder="finance@example.com" />
+              <input
+                className={inputClass}
+                type="email"
+                placeholder="finance@example.com"
+                value={form.email}
+                onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+              />
             </Field>
             <Field label="Required review track">
-              <select className={inputClass} defaultValue="FULL_KYB_AML">
+              <select
+                className={inputClass}
+                value={form.reviewTrack}
+                onChange={(event) => setForm((current) => ({ ...current, reviewTrack: event.target.value }))}
+              >
                 <option>FULL_KYB_AML</option>
                 <option>LIGHT_SUPPLIER_ENROLMENT</option>
                 <option>FUNDER_DILIGENCE</option>
                 <option>INVESTOR_DILIGENCE</option>
               </select>
             </Field>
-            <Button type="button">Create draft intake</Button>
+            <Button type="button" onClick={createDraft} disabled={!form.legalName.trim() || !form.email.trim()}>
+              Create draft intake
+            </Button>
             <p className="text-xs text-muted-foreground">
               Draft intakes should be promoted into counterparties once compliance evidence is complete.
             </p>
           </div>
         </Card>
       </div>
+      {drafts.length ? (
+        <Card className="mt-6">
+          <h3 className="mb-4 text-lg font-semibold">Draft intakes</h3>
+          <DataTable headers={["Reference", "Name", "Class", "Review track", "Status"]}>
+            {drafts.map((draft) => (
+              <tr key={String(draft.id)}>
+                <td className="px-4 py-3 font-medium">{String(draft.id)}</td>
+                <td className="px-4 py-3">{String(draft.legalName)}<br /><span className="text-xs text-muted-foreground">{String(draft.email)}</span></td>
+                <td className="px-4 py-3">{String(draft.counterpartyClass)}</td>
+                <td className="px-4 py-3">{String(draft.reviewTrack)}</td>
+                <td className="px-4 py-3"><StatusBadge value={String(draft.status)} tone="warning" /></td>
+              </tr>
+            ))}
+          </DataTable>
+        </Card>
+      ) : null}
     </AppShell>
   );
 }
 
 export function RatesWorkspacePage() {
+  const [published, setPublished] = useState(false);
+  const [previewed, setPreviewed] = useState(false);
   const rateRows = [
     ["GHS-BASE", "GHS", "Bank of Ghana policy-linked", "29.00%", "Active"],
     ["USD-SOFR", "USD", "SOFR reference curve", "5.31%", "Active"],
@@ -145,9 +210,19 @@ export function RatesWorkspacePage() {
             Rate cards should be published with effective dates so pricing can be reproduced for any historical transaction.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <Button type="button" variant="secondary">Preview impact</Button>
-            <Button type="button">Publish rate card</Button>
+            <Button type="button" variant="secondary" onClick={() => setPreviewed(true)}>Preview impact</Button>
+            <Button type="button" onClick={() => setPublished(true)}>Publish rate card</Button>
           </div>
+          {previewed ? (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Preview complete: this rate card would affect new programme pricing only.
+            </p>
+          ) : null}
+          {published ? (
+            <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              Rate card published as a draft-effective configuration pending backend rate-store persistence.
+            </div>
+          ) : null}
         </Card>
       </div>
     </AppShell>
@@ -155,6 +230,11 @@ export function RatesWorkspacePage() {
 }
 
 export function NotificationSettingsPage() {
+  const [provider, setProvider] = useState("console");
+  const [sender, setSender] = useState("no-reply@invox.local");
+  const [retryAttempts, setRetryAttempts] = useState("3");
+  const [saved, setSaved] = useState(false);
+
   return (
     <AppShell>
       <PageHeader
@@ -166,16 +246,38 @@ export function NotificationSettingsPage() {
           <h3 className="text-lg font-semibold">Provider configuration</h3>
           <div className="mt-4 space-y-4">
             <Field label="Email provider">
-              <select className={inputClass} defaultValue="console">
+              <select
+                className={inputClass}
+                value={provider}
+                onChange={(event) => {
+                  setProvider(event.target.value);
+                  setSaved(false);
+                }}
+              >
                 <option value="console">console</option>
                 <option value="smtp">smtp</option>
                 <option value="sendgrid">sendgrid</option>
                 <option value="ses">ses</option>
               </select>
             </Field>
-            <Field label="Default sender"><input className={inputClass} defaultValue="no-reply@invox.local" /></Field>
-            <Field label="Retry attempts"><input className={inputClass} type="number" defaultValue="3" /></Field>
-            <Button type="button">Save provider settings</Button>
+            <Field label="Default sender">
+              <input className={inputClass} value={sender} onChange={(event) => {
+                setSender(event.target.value);
+                setSaved(false);
+              }} />
+            </Field>
+            <Field label="Retry attempts">
+              <input className={inputClass} type="number" value={retryAttempts} onChange={(event) => {
+                setRetryAttempts(event.target.value);
+                setSaved(false);
+              }} />
+            </Field>
+            <Button type="button" onClick={() => setSaved(true)}>Save provider settings</Button>
+            {saved ? (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                Saved draft provider settings: {provider}, {sender}, {retryAttempts} retries.
+              </div>
+            ) : null}
           </div>
         </Card>
         <Card>
@@ -242,21 +344,29 @@ export function ApiDocsPage() {
 }
 
 export function ScheduledReportsPage() {
+  const [rows, setRows] = useState([
+    ["Daily exposure pack", "Risk and treasury", "Daily 07:00", "CSV + PDF", "Active"],
+    ["Investor NAV report", "Fund investors", "Monthly close", "PDF", "Draft"],
+    ["Regulatory audit export", "Auditors", "Quarterly", "CSV", "Paused"],
+    ["Settlement reconciliation", "Finance", "Daily 18:00", "CSV", "Active"],
+  ]);
+  const createSchedule = () => {
+    setRows((current) => [
+      [`Custom export ${current.length + 1}`, "Operations", "Weekly Monday 08:00", "CSV", "Draft"],
+      ...current,
+    ]);
+  };
+
   return (
     <AppShell>
       <PageHeader
         title="Scheduled Reports"
         description="Recurring exports for finance, funders, investors, auditors and regulators."
-        action={<Button type="button">Create schedule</Button>}
+        action={<Button type="button" onClick={createSchedule}>Create schedule</Button>}
       />
       <Card>
         <DataTable headers={["Report", "Audience", "Frequency", "Format", "Status"]}>
-          {[
-            ["Daily exposure pack", "Risk and treasury", "Daily 07:00", "CSV + PDF", "Active"],
-            ["Investor NAV report", "Fund investors", "Monthly close", "PDF", "Draft"],
-            ["Regulatory audit export", "Auditors", "Quarterly", "CSV", "Paused"],
-            ["Settlement reconciliation", "Finance", "Daily 18:00", "CSV", "Active"],
-          ].map((row) => (
+          {rows.map((row) => (
             <tr key={row[0]}>
               <td className="px-4 py-3 font-medium">{row[0]}</td>
               <td className="px-4 py-3">{row[1]}</td>
@@ -272,6 +382,13 @@ export function ScheduledReportsPage() {
 }
 
 export function BulkOperationsPage() {
+  const queues = [
+    ["Bulk invoice review", "Validate, approve or reject selected invoice batches.", "/invoices/exceptions"],
+    ["Bulk financing offers", "Generate offers for eligible approved invoices.", "/financing"],
+    ["Bulk approval actions", "Approve, reject or return maker-checker queues.", "/approvals/pending"],
+    ["Bulk payment release", "Submit disbursement and collection batches to treasury.", "/payments"],
+  ];
+
   return (
     <AppShell>
       <PageHeader
@@ -279,16 +396,13 @@ export function BulkOperationsPage() {
         description="Batch actions for invoice review, financing offers, approvals, payments and reconciliation queues."
       />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {[
-          ["Bulk invoice review", "Validate, approve or reject selected invoice batches."],
-          ["Bulk financing offers", "Generate offers for eligible approved invoices."],
-          ["Bulk approval actions", "Approve, reject or return maker-checker queues."],
-          ["Bulk payment release", "Submit disbursement and collection batches to treasury."],
-        ].map(([title, body]) => (
+        {queues.map(([title, body, href]) => (
           <Card key={title}>
             <p className="font-semibold">{title}</p>
             <p className="mt-2 text-sm text-muted-foreground">{body}</p>
-            <Button type="button" variant="secondary" className="mt-4">Open queue</Button>
+            <Link href={href} className="mt-4 inline-flex min-h-9 items-center justify-center rounded-md border border-border bg-card px-4 py-2 text-sm font-semibold text-card-foreground transition-colors hover:bg-muted">
+              Open queue
+            </Link>
           </Card>
         ))}
       </div>
@@ -334,5 +448,5 @@ export function AuditTrailPage() {
 }
 
 function formatEntityType(value: unknown) {
-  return String(value ?? "Unknown").replace(/^Phase2:/, "Product:");
+  return String(value ?? "Unknown");
 }

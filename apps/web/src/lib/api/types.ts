@@ -96,7 +96,7 @@ export type OperationsDashboard = {
   ledgerImbalance: string | number;
 };
 
-export type Phase2Resource =
+export type ProductResource =
   | "dynamic-discounting-offers"
   | "receivables-facilities"
   | "funder-marketplace-bids"
@@ -104,7 +104,7 @@ export type Phase2Resource =
   | "ai-anomaly-signals"
   | "investor-report-snapshots";
 
-export type Phase2Dashboard = {
+export type ProductDashboard = {
   openDynamicDiscountingOffers: number;
   acceptedDynamicDiscountingOffers: number;
   activeReceivablesFacilities: number;
@@ -243,7 +243,7 @@ export type InvestorReportSnapshot = {
   updatedAt: string;
 };
 
-export type Phase2Record =
+export type ProductRecord =
   | DynamicDiscountingOffer
   | ReceivablesFacility
   | FunderMarketplaceBid

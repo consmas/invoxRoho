@@ -19,7 +19,7 @@ import {
   createOperationRecord,
   createProgramme,
   createUser,
-  exportPhase2Csv,
+  exportProductCsv,
   approveApproval,
   cancelApproval,
   deleteFinancingTransaction,
@@ -43,7 +43,7 @@ import {
   getRoles,
   getUsers,
   getPendingApprovals,
-  getPhase2Records,
+  getProductRecords,
   rejectApproval,
   runCounterpartyFullComplianceCheck,
   runCounterpartyKyb,
@@ -70,7 +70,7 @@ import type {
   AdminUser,
   Programme,
   Role,
-  Phase2Resource,
+  ProductResource,
 } from "@/src/lib/api/types";
 import { formatDate, formatMoney, formatPercent } from "@/src/lib/format";
 import {
@@ -821,7 +821,7 @@ export function ApprovalDetailPage({ id }: { id: string }) {
                 ["Status", row.status],
                 ["Entity type", row.entityType],
                 ["Entity ID", row.entityId],
-                ["Target record", phase2ApprovalHref(row) ? "Open linked product record below" : "-"],
+                ["Target record", productApprovalHref(row) ? "Open linked product record below" : "-"],
                 ["Requested by", row.requestedById],
                 ["Approved by", row.approvedById ?? "-"],
                 ["Rejected by", row.rejectedById ?? "-"],
@@ -833,13 +833,13 @@ export function ApprovalDetailPage({ id }: { id: string }) {
                 ["Payload", formatJson(row.requestPayload)],
               ]}
             />
-            {phase2ApprovalHref(row) ? (
+            {productApprovalHref(row) ? (
               <Card>
                 <h3 className="mb-3 text-lg font-semibold">Product approval context</h3>
                 <p className="mb-4 text-sm text-slate-600">
-                  Requested action: {phase2RequestedAction(row)}
+                  Requested action: {productRequestedAction(row)}
                 </p>
-                <Link className="font-medium underline" href={phase2ApprovalHref(row) ?? "/approvals"}>
+                <Link className="font-medium underline" href={productApprovalHref(row) ?? "/approvals"}>
                   View target product record
                 </Link>
               </Card>
@@ -2047,7 +2047,7 @@ export function EditFinancingPage({ id }: { id: string }) {
 
 export function ReportsPage() {
   const { counterparties, invoices, financing } = useCoreData();
-  const phase2Resources: [Phase2Resource, string][] = [
+  const productResources: [ProductResource, string][] = [
     ["dynamic-discounting-offers", "Dynamic discounting"],
     ["receivables-facilities", "Receivables facilities"],
     ["funder-marketplace-bids", "Marketplace bids"],
@@ -2055,19 +2055,19 @@ export function ReportsPage() {
     ["ai-anomaly-signals", "Anomaly signals"],
     ["investor-report-snapshots", "Investor reports"],
   ];
-  const phase2Queries = {
-    dynamicDiscounting: useQuery({ queryKey: ["phase2", "dynamic-discounting-offers"], queryFn: () => getPhase2Records("dynamic-discounting-offers") }),
-    receivables: useQuery({ queryKey: ["phase2", "receivables-facilities"], queryFn: () => getPhase2Records("receivables-facilities") }),
-    marketplace: useQuery({ queryKey: ["phase2", "funder-marketplace-bids"], queryFn: () => getPhase2Records("funder-marketplace-bids") }),
-    esg: useQuery({ queryKey: ["phase2", "esg-scorecards"], queryFn: () => getPhase2Records("esg-scorecards") }),
-    anomalies: useQuery({ queryKey: ["phase2", "ai-anomaly-signals"], queryFn: () => getPhase2Records("ai-anomaly-signals") }),
-    investorReports: useQuery({ queryKey: ["phase2", "investor-report-snapshots"], queryFn: () => getPhase2Records("investor-report-snapshots") }),
+  const productQueries = {
+    dynamicDiscounting: useQuery({ queryKey: ["products", "dynamic-discounting-offers"], queryFn: () => getProductRecords("dynamic-discounting-offers") }),
+    receivables: useQuery({ queryKey: ["products", "receivables-facilities"], queryFn: () => getProductRecords("receivables-facilities") }),
+    marketplace: useQuery({ queryKey: ["products", "funder-marketplace-bids"], queryFn: () => getProductRecords("funder-marketplace-bids") }),
+    esg: useQuery({ queryKey: ["products", "esg-scorecards"], queryFn: () => getProductRecords("esg-scorecards") }),
+    anomalies: useQuery({ queryKey: ["products", "ai-anomaly-signals"], queryFn: () => getProductRecords("ai-anomaly-signals") }),
+    investorReports: useQuery({ queryKey: ["products", "investor-report-snapshots"], queryFn: () => getProductRecords("investor-report-snapshots") }),
   };
   const invoiceRows = invoices.data ?? [];
   const financingRows = financing.data ?? [];
   const counterpartyRows = counterparties.data ?? [];
-  const exportCsv = async (resource: Phase2Resource, label: string) => {
-    const blob = await exportPhase2Csv(resource);
+  const exportCsv = async (resource: ProductResource, label: string) => {
+    const blob = await exportProductCsv(resource);
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -2092,20 +2092,20 @@ export function ReportsPage() {
         </Card>
       </div>
       <div className="grid gap-6 lg:grid-cols-3">
-        <SummaryCard title="Dynamic discounting status" rows={countBy(phase2Queries.dynamicDiscounting.data ?? [], (row) => String((row as { status?: string }).status ?? "-"))} />
-        <SummaryCard title="Receivables status" rows={countBy(phase2Queries.receivables.data ?? [], (row) => String((row as { status?: string }).status ?? "-"))} />
-        <SummaryCard title="Marketplace bid status" rows={countBy(phase2Queries.marketplace.data ?? [], (row) => String((row as { participationStatus?: string }).participationStatus ?? "-"))} />
-        <SummaryCard title="ESG status" rows={countBy(phase2Queries.esg.data ?? [], (row) => String((row as { status?: string }).status ?? "-"))} />
-        <SummaryCard title="Anomaly severity" rows={countBy(phase2Queries.anomalies.data ?? [], (row) => String((row as { severity?: string }).severity ?? "-"))} />
+        <SummaryCard title="Dynamic discounting status" rows={countBy(productQueries.dynamicDiscounting.data ?? [], (row) => String((row as { status?: string }).status ?? "-"))} />
+        <SummaryCard title="Receivables status" rows={countBy(productQueries.receivables.data ?? [], (row) => String((row as { status?: string }).status ?? "-"))} />
+        <SummaryCard title="Marketplace bid status" rows={countBy(productQueries.marketplace.data ?? [], (row) => String((row as { participationStatus?: string }).participationStatus ?? "-"))} />
+        <SummaryCard title="ESG status" rows={countBy(productQueries.esg.data ?? [], (row) => String((row as { status?: string }).status ?? "-"))} />
+        <SummaryCard title="Anomaly severity" rows={countBy(productQueries.anomalies.data ?? [], (row) => String((row as { severity?: string }).severity ?? "-"))} />
         <Card>
           <p className="text-sm text-slate-500">Investor report snapshots</p>
-          <p className="mt-2 text-2xl font-semibold">{phase2Queries.investorReports.data?.length ?? 0}</p>
+          <p className="mt-2 text-2xl font-semibold">{productQueries.investorReports.data?.length ?? 0}</p>
         </Card>
       </div>
       <Card>
         <h3 className="mb-4 text-lg font-semibold">Product CSV exports</h3>
         <div className="flex flex-wrap gap-3">
-          {phase2Resources.map(([resource, label]) => (
+          {productResources.map(([resource, label]) => (
             <PermissionGate key={resource} permission={PERMISSIONS.reportExport}>
               <Button type="button" variant="secondary" onClick={() => void exportCsv(resource, label)}>
                 Export {label}
@@ -2431,26 +2431,22 @@ function formatJson(value: unknown) {
   );
 }
 
-function phase2ApprovalHref(row: ApprovalRequest) {
-  const prefix = row.entityType.startsWith("Product:")
-    ? "Product:"
-    : row.entityType.startsWith("Phase2:")
-      ? "Phase2:"
-      : "";
+function productApprovalHref(row: ApprovalRequest) {
+  const prefix = row.entityType.startsWith("Product:") ? "Product:" : "";
   if (!prefix) return null;
   const resource = row.entityType.replace(prefix, "");
   const paths: Record<string, string> = {
-    "dynamic-discounting-offers": "/phase2/dynamic-discounting",
-    "receivables-facilities": "/phase2/receivables",
-    "funder-marketplace-bids": "/phase2/marketplace-bids",
-    "esg-scorecards": "/phase2/esg",
-    "ai-anomaly-signals": "/phase2/anomalies",
-    "investor-report-snapshots": "/phase2/investor-reports",
+    "dynamic-discounting-offers": "/dynamic-discounting",
+    "receivables-facilities": "/receivables",
+    "funder-marketplace-bids": "/marketplace",
+    "esg-scorecards": "/esg",
+    "ai-anomaly-signals": "/anomalies",
+    "investor-report-snapshots": "/investor-reports",
   };
   return paths[resource] ? `${paths[resource]}/${row.entityId}` : null;
 }
 
-function phase2RequestedAction(row: ApprovalRequest) {
+function productRequestedAction(row: ApprovalRequest) {
   const payload = row.requestPayload as { action?: string } | null | undefined;
   return payload?.action ?? row.action;
 }

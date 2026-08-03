@@ -1,5 +1,5 @@
-import { Phase2ResourcePage } from "@/src/components/phase2-product-pages";
+import { ProductResourcePage } from "@/src/components/product-pages";
 
 export default function Page() {
-  return <Phase2ResourcePage resource="dynamic-discounting-offers" />;
+  return <ProductResourcePage resource="dynamic-discounting-offers" />;
 }

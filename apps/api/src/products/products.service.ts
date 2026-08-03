@@ -8,7 +8,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-export type Phase2Resource =
+export type ProductResource =
   | 'dynamic-discounting-offers'
   | 'receivables-facilities'
   | 'funder-marketplace-bids'
@@ -16,7 +16,7 @@ export type Phase2Resource =
   | 'ai-anomaly-signals'
   | 'investor-report-snapshots';
 
-const resources = new Set<Phase2Resource>([
+const resources = new Set<ProductResource>([
   'dynamic-discounting-offers',
   'receivables-facilities',
   'funder-marketplace-bids',
@@ -31,8 +31,18 @@ const approvalThresholds = {
   marketplaceBidAmount: 50000,
 };
 
+const jsonFields = new Set([
+  'rulesJson',
+  'eligibilityRules',
+  'conditionsJson',
+  'kpiJson',
+  'evidenceJson',
+  'rationaleJson',
+  'reportJson',
+]);
+
 @Injectable()
-export class Phase2ProductsService {
+export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -277,7 +287,7 @@ export class Phase2ProductsService {
     return record;
   }
 
-  private createRecord(resource: Phase2Resource, data: Record<string, unknown>) {
+  private createRecord(resource: ProductResource, data: Record<string, unknown>) {
     switch (resource) {
       case 'dynamic-discounting-offers':
         return this.prisma.dynamicDiscountingOffer.create({
@@ -306,7 +316,7 @@ export class Phase2ProductsService {
     }
   }
 
-  private findOneByResource(resource: Phase2Resource, id: string) {
+  private findOneByResource(resource: ProductResource, id: string) {
     switch (resource) {
       case 'dynamic-discounting-offers':
         return this.prisma.dynamicDiscountingOffer.findUniqueOrThrow({ where: { id } });
@@ -323,7 +333,7 @@ export class Phase2ProductsService {
     }
   }
 
-  private updateRecord(resource: Phase2Resource, id: string, data: Record<string, unknown>) {
+  private updateRecord(resource: ProductResource, id: string, data: Record<string, unknown>) {
     switch (resource) {
       case 'dynamic-discounting-offers':
         return this.prisma.dynamicDiscountingOffer.update({ where: { id }, data });
@@ -340,7 +350,7 @@ export class Phase2ProductsService {
     }
   }
 
-  private deleteRecord(resource: Phase2Resource, id: string) {
+  private deleteRecord(resource: ProductResource, id: string) {
     switch (resource) {
       case 'dynamic-discounting-offers':
         return this.prisma.dynamicDiscountingOffer.delete({ where: { id } });
@@ -358,7 +368,7 @@ export class Phase2ProductsService {
   }
 
   private calculateRecord(
-    resource: Phase2Resource,
+    resource: ProductResource,
     data: Record<string, unknown>,
   ) {
     if (resource === 'dynamic-discounting-offers') {
@@ -442,7 +452,7 @@ export class Phase2ProductsService {
   }
 
   private applyCalculatedDefaults(
-    resource: Phase2Resource,
+    resource: ProductResource,
     data: Record<string, unknown>,
   ) {
     const calculated = this.calculateRecord(resource, data) as Record<
@@ -480,7 +490,7 @@ export class Phase2ProductsService {
   }
 
   private requiresApproval(
-    resource: Phase2Resource,
+    resource: ProductResource,
     record: Record<string, unknown>,
     action: string,
     data: Record<string, unknown>,
@@ -519,7 +529,7 @@ export class Phase2ProductsService {
 
   private async executeActionWithImpact(
     tx: Prisma.TransactionClient,
-    resource: Phase2Resource,
+    resource: ProductResource,
     id: string,
     before: Record<string, unknown>,
     patch: Record<string, unknown>,
@@ -532,7 +542,7 @@ export class Phase2ProductsService {
 
   private updateRecordWithTx(
     tx: Prisma.TransactionClient,
-    resource: Phase2Resource,
+    resource: ProductResource,
     id: string,
     data: Record<string, unknown>,
   ) {
@@ -554,7 +564,7 @@ export class Phase2ProductsService {
 
   private async writeLifecycleImpact(
     tx: Prisma.TransactionClient,
-    resource: Phase2Resource,
+    resource: ProductResource,
     record: Record<string, unknown>,
     action: string,
   ) {
@@ -565,14 +575,14 @@ export class Phase2ProductsService {
       ]);
     }
     if (resource === 'receivables-facilities' && action === 'activate') {
-      await this.upsertPhase2Limit(tx, {
+      await this.upsertProductLimit(tx, {
         programmeId: optionalString(record.programmeId),
         counterpartyId: String(record.supplierId),
         currency: String(record.currency ?? 'GHS'),
         limitAmount: record.facilityLimit,
         source: 'receivables_facility_activation',
       });
-      await this.writePhase2Exposure(tx, {
+      await this.writeProductExposure(tx, {
         programmeId: optionalString(record.programmeId),
         counterpartyId: String(record.supplierId),
         currency: String(record.currency ?? 'GHS'),
@@ -588,7 +598,7 @@ export class Phase2ProductsService {
         ['1200', 'Marketplace funded asset', LedgerEntryType.DEBIT, record.offeredAmount],
         ['2200', 'Marketplace funder allocation payable', LedgerEntryType.CREDIT, record.offeredAmount],
       ]);
-      await this.writePhase2Exposure(tx, {
+      await this.writeProductExposure(tx, {
         counterpartyId: String(record.funderId),
         currency: String(record.currency ?? 'GHS'),
         exposureAmount: record.offeredAmount,
@@ -638,7 +648,7 @@ export class Phase2ProductsService {
     }
   }
 
-  private async upsertPhase2Limit(
+  private async upsertProductLimit(
     tx: Prisma.TransactionClient,
     input: {
       programmeId?: string;
@@ -671,7 +681,7 @@ export class Phase2ProductsService {
     });
   }
 
-  private async writePhase2Exposure(
+  private async writeProductExposure(
     tx: Prisma.TransactionClient,
     input: {
       programmeId?: string;
@@ -696,11 +706,11 @@ export class Phase2ProductsService {
     });
   }
 
-  private asResource(resource: string): Phase2Resource {
-    if (!resources.has(resource as Phase2Resource)) {
+  private asResource(resource: string): ProductResource {
+    if (!resources.has(resource as ProductResource)) {
       throw new BadRequestException(`Unsupported product resource: ${resource}`);
     }
-    return resource as Phase2Resource;
+    return resource as ProductResource;
   }
 
   private normalize(data: Record<string, unknown>) {
@@ -711,13 +721,16 @@ export class Phase2ProductsService {
           if (typeof value === 'string' && isDateField(key)) {
             return [key, new Date(value)];
           }
+          if (typeof value === 'string' && jsonFields.has(key)) {
+            return [key, parseJsonField(key, value)];
+          }
           return [key, value];
         }),
     );
   }
 
   private async validateRecord(
-    resource: Phase2Resource,
+    resource: ProductResource,
     data: Record<string, unknown>,
   ) {
     this.assertNonNegative(data, [
@@ -797,7 +810,7 @@ export class Phase2ProductsService {
   }
 
   private async assertLinkedRecords(
-    resource: Phase2Resource,
+    resource: ProductResource,
     data: Record<string, unknown>,
   ) {
     await Promise.all([
@@ -830,7 +843,7 @@ export class Phase2ProductsService {
     }
   }
 
-  private assertEditable(resource: Phase2Resource, record: Record<string, unknown>) {
+  private assertEditable(resource: ProductResource, record: Record<string, unknown>) {
     if (
       resource === 'dynamic-discounting-offers' &&
       ['ACCEPTED', 'SETTLED'].includes(String(record.status))
@@ -840,7 +853,7 @@ export class Phase2ProductsService {
   }
 
   private actionPatch(
-    resource: Phase2Resource,
+    resource: ProductResource,
     record: Record<string, unknown>,
     action: string,
     data: Record<string, unknown>,
@@ -955,6 +968,14 @@ function investorReportAction(action: string, now: Date) {
   if (action === 'publish') return { status: 'PUBLISHED' };
   if (action === 'archive') return { status: 'ARCHIVED' };
   throw new BadRequestException(`Unsupported investor report action: ${action}`);
+}
+
+function parseJsonField(key: string, value: string) {
+  try {
+    return JSON.parse(value) as Prisma.InputJsonValue;
+  } catch {
+    throw new BadRequestException(`${key} must contain valid JSON`);
+  }
 }
 
 function numberValue(value: unknown) {

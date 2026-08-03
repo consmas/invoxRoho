@@ -254,8 +254,7 @@ export class ApprovalsService {
           data: { status: FinancingStatus.CLOSED },
         });
       case 'PRODUCT_ACTION':
-      case 'PHASE2_ACTION':
-        return this.executePhase2Approval(approval);
+        return this.executeProductApproval(approval);
       case 'VERIFY_BANK_ACCOUNT':
         return this.prisma.bankAccount.update({
           where: { id: approval.entityId },
@@ -281,7 +280,7 @@ export class ApprovalsService {
     }
   }
 
-  private executePhase2Approval(
+  private executeProductApproval(
     approval: Awaited<ReturnType<ApprovalsService['findOne']>>,
   ) {
     const payload = approval.requestPayload as {
@@ -323,7 +322,7 @@ export class ApprovalsService {
         case 'receivables-facilities': {
           const row = await tx.receivablesFacility.update({
             where: { id: approval.entityId },
-            data: phase2StatusPatch(action, {
+            data: productStatusPatch(action, {
               approve: 'APPROVED',
               activate: 'ACTIVE',
               suspend: 'SUSPENDED',
@@ -363,7 +362,7 @@ export class ApprovalsService {
             data:
               action === 'confirm'
                 ? { participationStatus: 'CONFIRMED', confirmedAt: new Date() }
-                : phase2StatusPatch(action, {
+                : productStatusPatch(action, {
                     allocate: 'ALLOCATED',
                     withdraw: 'WITHDRAWN',
                   }, 'participationStatus'),
@@ -379,7 +378,7 @@ export class ApprovalsService {
         case 'esg-scorecards':
           return tx.esgScorecard.update({
             where: { id: approval.entityId },
-            data: phase2StatusPatch(action, {
+            data: productStatusPatch(action, {
               review: 'UNDER_REVIEW',
               activate: 'ACTIVE',
               expire: 'EXPIRED',
@@ -392,7 +391,7 @@ export class ApprovalsService {
   }
 }
 
-function phase2StatusPatch(
+function productStatusPatch(
   action: string,
   states: Record<string, string>,
   field = 'status',

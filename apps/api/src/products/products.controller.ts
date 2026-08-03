@@ -13,52 +13,52 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { RequirePermissions } from '../auth/decorators/permissions.decorator';
 import { PERMISSIONS } from '../auth/permissions';
-import { Phase2RecordDto } from './dto/phase2-record.dto';
-import { Phase2ProductsService } from './phase2-products.service';
+import { ProductRecordDto } from './dto/product-record.dto';
+import { ProductsService } from './products.service';
 
-@Controller(['phase2-products', 'products'])
-export class Phase2ProductsController {
-  constructor(private readonly phase2: Phase2ProductsService) {}
+@Controller('products')
+export class ProductsController {
+  constructor(private readonly products: ProductsService) {}
 
   @RequirePermissions(PERMISSIONS.reportRead)
   @Get('dashboard')
   dashboard() {
-    return this.phase2.dashboard();
+    return this.products.dashboard();
   }
 
   @RequirePermissions(PERMISSIONS.reportRead)
   @Get(':resource')
   findAll(@Param('resource') resource: string) {
-    return this.phase2.findAll(resource);
+    return this.products.findAll(resource);
   }
 
   @RequirePermissions(PERMISSIONS.reportExport)
   @Header('Content-Type', 'text/csv')
   @Get(':resource/export/csv')
   exportCsv(@Param('resource') resource: string) {
-    return this.phase2.exportCsv(resource);
+    return this.products.exportCsv(resource);
   }
 
   @RequirePermissions(PERMISSIONS.reportRead)
   @Get(':resource/:id')
   findOne(@Param('resource') resource: string, @Param('id') id: string) {
-    return this.phase2.findOne(resource, id);
+    return this.products.findOne(resource, id);
   }
 
   @RequirePermissions(PERMISSIONS.reportRead)
   @Post(':resource/calculate')
   calculate(@Param('resource') resource: string, @Body() body: Record<string, unknown>) {
-    return this.phase2.calculate(resource, body);
+    return this.products.calculate(resource, body);
   }
 
   @RequirePermissions(PERMISSIONS.productConfigure)
   @Post(':resource')
   create(
     @Param('resource') resource: string,
-    @Body() dto: Phase2RecordDto,
+    @Body() dto: ProductRecordDto,
     @CurrentUser() user?: AuthenticatedUser,
   ) {
-    return this.phase2.create(resource, dto.data, user?.id);
+    return this.products.create(resource, dto.data, user?.id);
   }
 
   @RequirePermissions(PERMISSIONS.productConfigure)
@@ -66,10 +66,10 @@ export class Phase2ProductsController {
   update(
     @Param('resource') resource: string,
     @Param('id') id: string,
-    @Body() dto: Phase2RecordDto,
+    @Body() dto: ProductRecordDto,
     @CurrentUser() user?: AuthenticatedUser,
   ) {
-    return this.phase2.update(resource, id, dto.data, user?.id);
+    return this.products.update(resource, id, dto.data, user?.id);
   }
 
   @RequirePermissions(PERMISSIONS.productConfigure)
@@ -79,7 +79,7 @@ export class Phase2ProductsController {
     @Param('id') id: string,
     @CurrentUser() user?: AuthenticatedUser,
   ) {
-    return this.phase2.remove(resource, id, user?.id);
+    return this.products.remove(resource, id, user?.id);
   }
 
   @RequirePermissions(PERMISSIONS.productConfigure)
@@ -93,6 +93,6 @@ export class Phase2ProductsController {
     @Body() body: Record<string, unknown> = {},
     @CurrentUser() user?: AuthenticatedUser,
   ) {
-    return this.phase2.action(resource, id, action, body, user?.id, idempotencyKey ?? xIdempotencyKey);
+    return this.products.action(resource, id, action, body, user?.id, idempotencyKey ?? xIdempotencyKey);
   }
 }
