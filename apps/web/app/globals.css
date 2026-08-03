@@ -15,6 +15,19 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
+  --color-brass-600: #9c7a3f;
+  --color-brass-400: #c6a467;
+  --color-brass-100: #f2e9d8;
+  --color-danger-700: #8c2f22;
+  --color-danger-600: #a83b2b;
+  --color-danger-50: #faece9;
+  --color-paper: #faf9f6;
+  --color-surface: #ffffff;
+  --color-hairline: #e7e3da;
+  --color-ink-900: #1c1b18;
+  --color-ink-700: #4a473f;
+  --color-ink-500: #847f72;
+  --color-ink-400: #a39d8d;
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -22,24 +35,24 @@
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
 }
 
 :root {
-  --background: #f6f7f9;
-  --foreground: #101828;
+  --background: #faf9f6;
+  --foreground: #1c1b18;
   --card: #ffffff;
-  --card-foreground: #101828;
-  --primary: #1e3a8a;
+  --card-foreground: #1c1b18;
+  --primary: #2b3f6b;
   --primary-foreground: #ffffff;
-  --muted: #f1f3f6;
-  --muted-foreground: #667085;
-  --border: #e2e5ea;
-  --input: #d8dde6;
-  --ring: #1e3a8a;
-  --destructive: #c4402b;
-  --sidebar: #0b1d3a;
+  --muted: #f6f7fb;
+  --muted-foreground: #847f72;
+  --border: #e7e3da;
+  --input: #e7e3da;
+  --ring: #1b2a4a;
+  --destructive: #a83b2b;
+  --sidebar: #0a101f;
   --sidebar-foreground: #ffffff;
   --sidebar-primary: #ffffff;
   --sidebar-primary-foreground: #0b1d3a;
@@ -52,6 +65,11 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-variant-numeric: tabular-nums;
+}
+
+h1,
+.display-serif {
+  font-family: var(--font-newsreader), var(--font-geist-sans), serif;
 }
 
 button,
@@ -69,4 +87,10 @@ textarea {
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+.shadow-raised {
+  box-shadow:
+    0 2px 6px rgb(28 27 24 / 0.07),
+    0 1px 2px rgb(28 27 24 / 0.05);
 }

@@ -12,6 +12,7 @@ import {
   createWebhookEndpoint,
   deleteDocument,
   deleteWebhookEndpoint,
+  getCounterparties,
   disableIntegrationConnection,
   enableIntegrationConnection,
   getDocument,
@@ -41,10 +42,12 @@ import {
   Button,
   Card,
   DataTable,
+  EntityPicker,
   Field,
   LinkButton,
   PageHeader,
   StatusMessage,
+  type EntityOption,
   inputClass,
 } from "./app-shell";
 
@@ -53,15 +56,23 @@ type AnyRecord = Record<string, unknown>;
 export function DocumentsPage() {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["documents"], queryFn: getDocuments });
+  const counterparties = useQuery({ queryKey: ["counterparties"], queryFn: getCounterparties });
   const [file, setFile] = useState<File | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<EntityOption | null>(null);
   const [form, setForm] = useState({
     documentType: "KYC_DOCUMENT",
     title: "",
-    counterpartyId: "",
-    programmeId: "",
-    invoiceId: "",
-    financingTransactionId: "",
   });
+  const entityOptions = useMemo(
+    () =>
+      (counterparties.data ?? []).map((counterparty) => ({
+        id: counterparty.id,
+        label: counterparty.legalName,
+        sublabel: `${counterparty.type} · ${counterparty.country}`,
+        type: "Counterparty",
+      })),
+    [counterparties.data],
+  );
   const upload = useMutation({
     mutationFn: () => {
       const data = new FormData();
@@ -70,9 +81,16 @@ export function DocumentsPage() {
       for (const [key, value] of Object.entries(form)) {
         if (value) data.set(key, value);
       }
+      if (selectedEntity?.type === "Counterparty") {
+        data.set("counterpartyId", selectedEntity.id);
+      }
       return uploadDocument(data);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents"] }),
+    onSuccess: () => {
+      setFile(null);
+      setSelectedEntity(null);
+      return queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
   });
   return (
     <AppShell>
@@ -83,11 +101,21 @@ export function DocumentsPage() {
           <Field label="File"><input className={inputClass} type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></Field>
           <TextInput label="Document type" value={form.documentType} onChange={(value) => setForm({ ...form, documentType: value })} />
           <TextInput label="Title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} />
-          <TextInput label="Counterparty ID" value={form.counterpartyId} onChange={(value) => setForm({ ...form, counterpartyId: value })} />
-          <TextInput label="Programme ID" value={form.programmeId} onChange={(value) => setForm({ ...form, programmeId: value })} />
-          <TextInput label="Invoice ID" value={form.invoiceId} onChange={(value) => setForm({ ...form, invoiceId: value })} />
-          <TextInput label="Financing ID" value={form.financingTransactionId} onChange={(value) => setForm({ ...form, financingTransactionId: value })} />
-          <Button onClick={() => upload.mutate()} disabled={upload.isPending}>{upload.isPending ? "Uploading..." : "Upload"}</Button>
+          <Field label="Linked entity">
+            <EntityPicker
+              options={entityOptions}
+              value={selectedEntity}
+              onChange={setSelectedEntity}
+              placeholder="Search counterparty to attach this document..."
+            />
+          </Field>
+          <CreateSummary rows={[
+            ["File", file?.name ?? "Not selected"],
+            ["Type", form.documentType],
+            ["Title", form.title || "-"],
+            ["Linked entity", selectedEntity ? `${selectedEntity.type}: ${selectedEntity.label}` : "-"],
+          ]} />
+          <Button className="mt-4" onClick={() => upload.mutate()} disabled={upload.isPending || !file}>{upload.isPending ? "Uploading..." : "Upload"}</Button>
           {upload.isError ? <ErrorText error={upload.error} /> : null}
         </Card>
         <RecordTable
@@ -129,14 +157,39 @@ export function DocumentDetailPage({ id }: { id: string }) {
 export function NotificationsPage() {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["notifications"], queryFn: getNotifications });
-  const [json, setJson] = useState('{"channel":"EMAIL","recipient":"ops@example.com","subject":"Test","message":"Hello"}');
+  const counterparties = useQuery({ queryKey: ["counterparties"], queryFn: getCounterparties });
+  const [selectedRecipient, setSelectedRecipient] = useState<EntityOption | null>(null);
+  const [notificationForm, setNotificationForm] = useState({
+    channel: "EMAIL",
+    recipient: "ops@example.com",
+    templateKey: "general.notice",
+    subject: "INVOX notification",
+    message: "Hello",
+  });
   const [channelFilter, setChannelFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [templateFilter, setTemplateFilter] = useState("");
   const create = useMutation({
-    mutationFn: () => createNotification(JSON.parse(json) as AnyRecord),
+    mutationFn: () =>
+      createNotification({
+        ...notificationForm,
+        recipient: notificationForm.recipient || selectedRecipient?.sublabel || selectedRecipient?.label,
+        metadata: selectedRecipient
+          ? { recipientEntityId: selectedRecipient.id, recipientEntityType: selectedRecipient.type }
+          : undefined,
+      }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
   });
+  const recipientOptions = useMemo(
+    () =>
+      (counterparties.data ?? []).map((counterparty) => ({
+        id: counterparty.id,
+        label: counterparty.legalName,
+        sublabel: counterparty.contactEmail ?? `${counterparty.type} · ${counterparty.country}`,
+        type: "Counterparty",
+      })),
+    [counterparties.data],
+  );
   const rows = useMemo(() => {
     return ((query.data ?? []) as AnyRecord[]).filter((row) => {
       const channelMatch = !channelFilter || row.channel === channelFilter;
@@ -162,7 +215,29 @@ export function NotificationsPage() {
       <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
         <Card>
           <h3 className="mb-4 text-lg font-semibold">Create notification</h3>
-          <textarea className={`${inputClass} min-h-52 font-mono`} value={json} onChange={(event) => setJson(event.target.value)} />
+          <div className="grid gap-4">
+            <Field label="Recipient entity">
+              <EntityPicker
+                options={recipientOptions}
+                value={selectedRecipient}
+                onChange={setSelectedRecipient}
+                placeholder="Search counterparty recipient..."
+              />
+            </Field>
+            <TextInput label="Recipient address" value={notificationForm.recipient} onChange={(recipient) => setNotificationForm({ ...notificationForm, recipient })} />
+            <SelectInput label="Channel" value={notificationForm.channel} onChange={(channel) => setNotificationForm({ ...notificationForm, channel })} options={["EMAIL", "SMS", "IN_APP", "WHATSAPP", "WEBHOOK"]} />
+            <SelectInput label="Template" value={notificationForm.templateKey} onChange={(templateKey) => setNotificationForm({ ...notificationForm, templateKey })} options={["general.notice", "payment.created", "kyc.review", "programme.approved", "invoice.exception"]} />
+            <TextInput label="Subject" value={notificationForm.subject} onChange={(subject) => setNotificationForm({ ...notificationForm, subject })} />
+            <Field label="Message">
+              <textarea className={`${inputClass} min-h-24`} value={notificationForm.message} onChange={(event) => setNotificationForm({ ...notificationForm, message: event.target.value })} />
+            </Field>
+            <CreateSummary rows={[
+              ["Recipient", selectedRecipient?.label ?? notificationForm.recipient],
+              ["Channel", notificationForm.channel],
+              ["Template", notificationForm.templateKey],
+              ["Subject", notificationForm.subject],
+            ]} />
+          </div>
           <Button className="mt-4" onClick={() => create.mutate()} disabled={create.isPending}>
             {create.isPending ? "Creating..." : "Create notification"}
           </Button>
@@ -220,25 +295,54 @@ export function NotificationDetailPage({ id }: { id: string }) {
 export function IntegrationConnectionsPage({ createMode = false }: { createMode?: boolean }) {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["integration-connections"], queryFn: getIntegrationConnections });
-  const [json, setJson] = useState('{"name":"Mock Payment","providerType":"PAYMENT","providerKey":"mock","environment":"SANDBOX"}');
+  const [form, setForm] = useState({
+    name: "Mock Payment",
+    providerType: "PAYMENT",
+    providerKey: "mock",
+    environment: "SANDBOX",
+  });
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [advancedJson, setAdvancedJson] = useState("{}");
   const create = useMutation({
-    mutationFn: () => createIntegrationConnection(JSON.parse(json) as AnyRecord),
+    mutationFn: () =>
+      createIntegrationConnection({
+        ...form,
+        configJson: JSON.parse(advancedJson || "{}") as AnyRecord,
+      }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["integration-connections"] }),
   });
   return (
-    <JsonCreateListPage
-      title={createMode ? "New Integration Connection" : "Integration Connections"}
-      description="Manage sandbox provider connections without exposing credentials."
-      json={json}
-      setJson={setJson}
-      createLabel="Create connection"
-      create={() => create.mutate()}
-      createPending={create.isPending}
-      createError={create.error}
-      query={query}
-      detailBase="/integrations/connections"
-      columns={["name", "providerType", "providerKey", "status", "environment"]}
-    />
+    <AppShell>
+      <PageHeader title={createMode ? "New Integration Connection" : "Integration Connections"} description="Manage sandbox provider connections without exposing credentials." />
+      <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+        <Card>
+          <h3 className="mb-4 text-lg font-semibold">Create connection</h3>
+          <div className="grid gap-4">
+            <SelectInput label="Provider type" value={form.providerType} onChange={(providerType) => setForm({ ...form, providerType })} options={["PAYMENT", "ERP", "EINVOICING", "KYC", "SCREENING", "MESSAGING"]} />
+            <TextInput label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} />
+            <TextInput label="Provider key" value={form.providerKey} onChange={(providerKey) => setForm({ ...form, providerKey })} />
+            <SelectInput label="Environment" value={form.environment} onChange={(environment) => setForm({ ...form, environment })} options={["SANDBOX", "STAGING", "PRODUCTION"]} />
+            <AdvancedJson
+              open={advancedOpen}
+              onOpenChange={setAdvancedOpen}
+              value={advancedJson}
+              onChange={setAdvancedJson}
+              label="Advanced config"
+            />
+            <CreateSummary rows={[
+              ["Name", form.name],
+              ["Provider", `${form.providerType} / ${form.providerKey}`],
+              ["Environment", form.environment],
+            ]} />
+          </div>
+          <Button className="mt-4" onClick={() => create.mutate()} disabled={create.isPending}>
+            {create.isPending ? "Saving..." : "Create connection"}
+          </Button>
+          {create.error ? <ErrorText error={create.error} /> : null}
+        </Card>
+        <RecordTable title="Records" query={query} detailBase="/integrations/connections" columns={["name", "providerType", "providerKey", "status", "environment"]} />
+      </div>
+    </AppShell>
   );
 }
 
@@ -277,25 +381,57 @@ export function IntegrationLogDetailPage({ id }: { id: string }) {
 export function WebhookEndpointsPage({ createMode = false }: { createMode?: boolean }) {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["webhook-endpoints"], queryFn: getWebhookEndpoints });
-  const [json, setJson] = useState('{"name":"Local Test","url":"http://localhost:9999/webhook","events":["invoice.approved"]}');
+  const [form, setForm] = useState({
+    name: "Local Test",
+    url: "http://localhost:9999/webhook",
+    events: ["invoice.approved"],
+    payloadTemplate: "{}",
+  });
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const create = useMutation({
-    mutationFn: () => createWebhookEndpoint(JSON.parse(json) as AnyRecord),
+    mutationFn: () =>
+      createWebhookEndpoint({
+        name: form.name,
+        url: form.url,
+        events: form.events,
+        payloadTemplate: JSON.parse(form.payloadTemplate || "{}") as AnyRecord,
+      }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["webhook-endpoints"] }),
   });
   return (
-    <JsonCreateListPage
-      title={createMode ? "New Webhook Endpoint" : "Webhook Endpoints"}
-      description="Register signed event destinations and inspect delivery state."
-      json={json}
-      setJson={setJson}
-      createLabel="Create endpoint"
-      create={() => create.mutate()}
-      createPending={create.isPending}
-      createError={create.error}
-      query={query}
-      detailBase="/webhooks/endpoints"
-      columns={["name", "url", "status", "events", "createdAt"]}
-    />
+    <AppShell>
+      <PageHeader title={createMode ? "New Webhook Endpoint" : "Webhook Endpoints"} description="Register signed event destinations and inspect delivery state." />
+      <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+        <Card>
+          <h3 className="mb-4 text-lg font-semibold">Create endpoint</h3>
+          <div className="grid gap-4">
+            <TextInput label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} />
+            <TextInput label="URL" value={form.url} onChange={(url) => setForm({ ...form, url })} />
+            <EventMultiSelect
+              value={form.events}
+              onChange={(events) => setForm({ ...form, events })}
+            />
+            <AdvancedJson
+              open={advancedOpen}
+              onOpenChange={setAdvancedOpen}
+              value={form.payloadTemplate}
+              onChange={(payloadTemplate) => setForm({ ...form, payloadTemplate })}
+              label="Raw payload template"
+            />
+            <CreateSummary rows={[
+              ["Name", form.name],
+              ["URL", form.url],
+              ["Events", form.events.join(", ")],
+            ]} />
+          </div>
+          <Button className="mt-4" onClick={() => create.mutate()} disabled={create.isPending || !form.url}>
+            {create.isPending ? "Saving..." : "Create endpoint"}
+          </Button>
+          {create.error ? <ErrorText error={create.error} /> : null}
+        </Card>
+        <RecordTable title="Records" query={query} detailBase="/webhooks/endpoints" columns={["name", "url", "status", "events", "createdAt"]} />
+      </div>
+    </AppShell>
   );
 }
 
@@ -332,46 +468,6 @@ export function WebhookDeliveryDetailPage({ id }: { id: string }) {
         <Button onClick={() => cancel.mutate()} disabled={cancel.isPending}>Cancel</Button>
       </ActionRow>
     </DetailShell>
-  );
-}
-
-function JsonCreateListPage({
-  title,
-  description,
-  json,
-  setJson,
-  createLabel,
-  create,
-  createPending,
-  createError,
-  query,
-  detailBase,
-  columns,
-}: {
-  title: string;
-  description: string;
-  json: string;
-  setJson: (value: string) => void;
-  createLabel: string;
-  create: () => void;
-  createPending: boolean;
-  createError: unknown;
-  query: ReturnType<typeof useQuery<unknown[], Error>>;
-  detailBase: string;
-  columns: string[];
-}) {
-  return (
-    <AppShell>
-      <PageHeader title={title} description={description} />
-      <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
-        <Card>
-          <textarea className={`${inputClass} min-h-56 font-mono text-xs`} value={json} onChange={(event) => setJson(event.target.value)} />
-          <div className="mt-4"><Button onClick={create} disabled={createPending}>{createPending ? "Saving..." : createLabel}</Button></div>
-          {createError ? <ErrorText error={createError} /> : null}
-        </Card>
-        <RecordTable title="Records" query={query} detailBase={detailBase} columns={columns} />
-      </div>
-    </AppShell>
   );
 }
 
@@ -422,6 +518,102 @@ function SelectInput({ label, value, onChange, options }: { label: string; value
           <option key={option || "all"} value={option}>{option || "All"}</option>
         ))}
       </select>
+    </Field>
+  );
+}
+
+function CreateSummary({ rows }: { rows: [string, React.ReactNode][] }) {
+  return (
+    <div className="rounded-md border border-border bg-muted p-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        Creation summary
+      </p>
+      <div className="space-y-1.5">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex justify-between gap-4 text-sm">
+            <span className="text-muted-foreground">{label}</span>
+            <span className="text-right font-medium">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdvancedJson({
+  open,
+  onOpenChange,
+  value,
+  onChange,
+  label,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+}) {
+  return (
+    <div className="rounded-md border border-border">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
+        onClick={() => onOpenChange(!open)}
+      >
+        <span>{label}</span>
+        <span className="text-xs text-muted-foreground">{open ? "Hide" : "Show"}</span>
+      </button>
+      {open ? (
+        <div className="border-t border-border p-3">
+          <textarea
+            className={`${inputClass} min-h-28 font-mono text-xs`}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function EventMultiSelect({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (value: string[]) => void;
+}) {
+  const events = [
+    "invoice.approved",
+    "invoice.exception",
+    "financing.accepted",
+    "payment.confirmed",
+    "payment.failed",
+    "kyc.review_required",
+  ];
+  return (
+    <Field label="Event types">
+      <div className="grid gap-2 rounded-md border border-border p-3">
+        {events.map((event) => {
+          const checked = value.includes(event);
+          return (
+            <label key={event} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={(inputEvent) => {
+                  if (inputEvent.target.checked) {
+                    onChange([...value, event]);
+                  } else {
+                    onChange(value.filter((item) => item !== event));
+                  }
+                }}
+              />
+              <span>{event}</span>
+            </label>
+          );
+        })}
+      </div>
     </Field>
   );
 }

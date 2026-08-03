@@ -7,6 +7,7 @@ import {
   approvePayment,
   confirmPayment,
   createPayment,
+  getCounterparties,
   failPayment,
   getPayment,
   getPaymentWebhookEvent,
@@ -25,37 +26,63 @@ import {
   AppShell,
   Button,
   Card,
+  ConfirmDialog,
   DataTable,
+  EntityPicker,
   LinkButton,
   PageHeader,
   PermissionGate,
   StatusMessage,
+  type EntityOption,
   inputClass,
 } from "./app-shell";
 import { PERMISSIONS } from "@/src/lib/permissions";
 
-const newPaymentTemplate = {
-  financingTransactionId: "",
+const initialPaymentForm = {
   counterpartyId: "",
   direction: "OUTBOUND",
   rail: "SANDBOX",
   currency: "GHS",
-  amount: "0",
+  amount: "",
   reference: "PAY-",
-  status: "INITIATED",
-  valueDate: new Date().toISOString(),
+  provider: "sandbox",
+  valueDate: new Date().toISOString().slice(0, 10),
 };
 
 export function PaymentsPage() {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["payments"], queryFn: getPayments });
-  const [json, setJson] = useState(JSON.stringify(newPaymentTemplate, null, 2));
+  const counterparties = useQuery({ queryKey: ["counterparties"], queryFn: getCounterparties });
+  const [form, setForm] = useState(initialPaymentForm);
+  const [selectedCounterparty, setSelectedCounterparty] = useState<EntityOption | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
   const [providerFilter, setProviderFilter] = useState("");
   const create = useMutation({
-    mutationFn: () => createPayment(JSON.parse(json) as Record<string, unknown>),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["payments"] }),
+    mutationFn: () =>
+      createPayment({
+        ...form,
+        counterpartyId: selectedCounterparty?.id || undefined,
+        amount: Number(form.amount),
+        status: "INITIATED",
+        valueDate: new Date(form.valueDate).toISOString(),
+      }),
+    onSuccess: () => {
+      setForm(initialPaymentForm);
+      setSelectedCounterparty(null);
+      return queryClient.invalidateQueries({ queryKey: ["payments"] });
+    },
   });
+  const counterpartyOptions = useMemo(
+    () =>
+      (counterparties.data ?? []).map((counterparty) => ({
+        id: counterparty.id,
+        label: counterparty.legalName,
+        sublabel: `${counterparty.type} · ${counterparty.country}`,
+        type: "Counterparty",
+      })),
+    [counterparties.data],
+  );
   const rows = useMemo(() => {
     return (query.data ?? []).filter((row) => {
       const statusMatch = !statusFilter || row.status === statusFilter;
@@ -81,14 +108,50 @@ export function PaymentsPage() {
         <PermissionGate permission={PERMISSIONS.paymentsCreate}>
           <Card>
             <h3 className="mb-4 text-lg font-semibold">Create payment</h3>
-            <textarea
-              className={`${inputClass} min-h-64 font-mono text-xs`}
-              value={json}
-              onChange={(event) => setJson(event.target.value)}
-            />
-            <Button className="mt-4" onClick={() => create.mutate()} disabled={create.isPending}>
+            <div className="grid gap-4">
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-semibold">Counterparty</span>
+                <EntityPicker
+                  options={counterpartyOptions}
+                  value={selectedCounterparty}
+                  onChange={setSelectedCounterparty}
+                  placeholder="Search counterparty receiving or sending payment..."
+                />
+              </label>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+                <TextInput label="Amount" value={form.amount} onChange={(amount) => setForm({ ...form, amount })} />
+                <SelectInput label="Currency" value={form.currency} onChange={(currency) => setForm({ ...form, currency })} options={["GHS", "USD", "EUR", "GBP"]} />
+              </div>
+              <SelectInput label="Provider" value={form.provider} onChange={(provider) => setForm({ ...form, provider })} options={["sandbox", "bank", "mobile_money"]} />
+              <SelectInput label="Payment type" value={form.direction} onChange={(direction) => setForm({ ...form, direction })} options={["OUTBOUND", "INBOUND"]} />
+              <TextInput label="Reference" value={form.reference} onChange={(reference) => setForm({ ...form, reference })} />
+              <TextInput label="Value date" value={form.valueDate} onChange={(valueDate) => setForm({ ...form, valueDate })} type="date" />
+              <CreateSummary
+                rows={[
+                  ["Counterparty", selectedCounterparty?.label ?? "Not selected"],
+                  ["Amount", form.amount ? formatMoney(form.amount, form.currency) : "-"],
+                  ["Provider", form.provider],
+                  ["Type", form.direction],
+                ]}
+              />
+            </div>
+            <Button
+              className="mt-4"
+              variant="brass"
+              onClick={() => setConfirmOpen(true)}
+              disabled={create.isPending || !selectedCounterparty || !Number(form.amount)}
+            >
               {create.isPending ? "Creating..." : "Create payment"}
             </Button>
+            <ConfirmDialog
+              open={confirmOpen}
+              onOpenChange={setConfirmOpen}
+              title="Confirm payment creation"
+              description={`Initiate payment of ${form.amount ? formatMoney(form.amount, form.currency) : `${form.currency} 0.00`} ${form.direction === "OUTBOUND" ? "to" : "from"} ${selectedCounterparty?.label ?? "the selected counterparty"} through ${form.provider}? This cannot be reversed once sent to the payment provider.`}
+              confirmLabel="Create payment"
+              tone="brass"
+              onConfirm={() => create.mutate()}
+            />
             {create.isError ? <ErrorText error={create.error} /> : null}
           </Card>
         </PermissionGate>
@@ -392,6 +455,71 @@ function FilterSelect({
         ))}
       </select>
     </label>
+  );
+}
+
+function TextInput({
+  label,
+  value,
+  onChange,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-sm font-medium">{label}</span>
+      <input
+        className={inputClass}
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
+function SelectInput({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-sm font-medium">{label}</span>
+      <select className={inputClass} value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function CreateSummary({ rows }: { rows: [string, React.ReactNode][] }) {
+  return (
+    <div className="rounded-md border border-border bg-muted p-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        Creation summary
+      </p>
+      <div className="space-y-1.5">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex justify-between gap-4 text-sm">
+            <span className="text-muted-foreground">{label}</span>
+            <span className="text-right font-medium">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

@@ -76,6 +76,7 @@ import {
   AppShell,
   Button,
   Card,
+  ConfirmDialog,
   DataTable,
   Field,
   LinkButton,
@@ -666,7 +667,7 @@ export function UserManagementPage() {
                   <option key={status} value={status}>{status}</option>
                 ))}
               </SelectField>
-              <RoleCheckboxes
+              <RoleTemplatePicker
                 roles={roles.data ?? []}
                 selectedRoleIds={createRoleIds}
                 onChange={(roleIds) => form.setValue("roleIds", roleIds)}
@@ -753,6 +754,8 @@ export function ApprovalDetailPage({ id }: { id: string }) {
   const query = useQuery({ queryKey: ["approval", id], queryFn: () => getApproval(id) });
   const [comment, setComment] = useState("");
   const [reason, setReason] = useState("");
+  const [approveOpen, setApproveOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
   const approve = useMutation({
     mutationFn: () => approveApproval(id, { comment }),
     onSuccess: async () => {
@@ -817,8 +820,8 @@ export function ApprovalDetailPage({ id }: { id: string }) {
                 </div>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <PermissionGate permission={PERMISSIONS.workflowComplete}>
-                    <Button disabled={approve.isPending} onClick={() => approve.mutate()}>Approve</Button>
-                    <Button variant="danger" disabled={reject.isPending} onClick={() => reject.mutate()}>Reject</Button>
+                    <Button disabled={approve.isPending} variant="brass" onClick={() => setApproveOpen(true)}>Approve</Button>
+                    <Button variant="danger" disabled={reject.isPending} onClick={() => setRejectOpen(true)}>Reject</Button>
                   </PermissionGate>
                   <PermissionGate permission={PERMISSIONS.workflowCancel}>
                     <Button variant="secondary" disabled={cancel.isPending} onClick={() => cancel.mutate()}>Cancel</Button>
@@ -827,6 +830,24 @@ export function ApprovalDetailPage({ id }: { id: string }) {
                 {approve.isError ? <ErrorText error={approve.error} /> : null}
                 {reject.isError ? <ErrorText error={reject.error} /> : null}
                 {cancel.isError ? <ErrorText error={cancel.error} /> : null}
+                <ConfirmDialog
+                  open={approveOpen}
+                  onOpenChange={setApproveOpen}
+                  title="Approve request"
+                  description={`Approve ${row.action} for ${row.entityType}:${row.entityId.slice(0, 8)}? This records your decision in the audit trail and may advance the source workflow.`}
+                  confirmLabel="Approve"
+                  tone="brass"
+                  onConfirm={() => approve.mutate()}
+                />
+                <ConfirmDialog
+                  open={rejectOpen}
+                  onOpenChange={setRejectOpen}
+                  title="Reject request"
+                  description={`Reject ${row.action} for ${row.entityType}:${row.entityId.slice(0, 8)}? The requester will see the rejection reason and the source workflow will remain blocked.`}
+                  confirmLabel="Reject"
+                  tone="destructive"
+                  onConfirm={() => reject.mutate()}
+                />
               </Card>
             ) : null}
           </div>
@@ -2965,45 +2986,142 @@ function FinancingEditForm({
   );
 }
 
-function RoleCheckboxes({
+function RoleTemplatePicker({
   roles,
   selectedRoleIds,
   onChange,
+  compact = false,
 }: {
   roles: Role[];
   selectedRoleIds: string[];
   onChange: (roleIds: string[]) => void;
+  compact?: boolean;
 }) {
+  const [mode, setMode] = useState(compact ? "summary" : "");
+  const selectedRoles = roles.filter((role) => selectedRoleIds.includes(role.id));
+  const templates = roleTemplates(roles);
+
   return (
     <div>
-      <p className="mb-2 text-sm font-medium text-slate-700">Roles</p>
-      <div className="max-h-56 space-y-2 overflow-auto rounded-md border border-slate-200 p-3">
-        {roles.map((role) => {
-          const checked = selectedRoleIds.includes(role.id);
-          return (
-            <label key={role.id} className="flex items-start gap-2 text-sm">
-              <input
-                className="mt-1"
-                type="checkbox"
-                checked={checked}
-                onChange={(event) => {
-                  if (event.target.checked) {
-                    onChange([...selectedRoleIds, role.id]);
-                  } else {
-                    onChange(selectedRoleIds.filter((roleId) => roleId !== role.id));
-                  }
-                }}
-              />
-              <span>
-                <span className="block font-medium text-slate-800">{role.name}</span>
-                <span className="block text-xs text-slate-500">{role.description ?? `${role.permissions.length} permissions`}</span>
-              </span>
-            </label>
-          );
-        })}
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-slate-700">Roles</p>
+        {compact ? (
+          <button
+            type="button"
+            className="text-xs font-medium underline"
+            onClick={() => setMode(mode === "custom" ? "summary" : "custom")}
+          >
+            {mode === "custom" ? "Hide role editor" : "Edit access"}
+          </button>
+        ) : null}
       </div>
+
+      {selectedRoles.length ? (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {selectedRoles.map((role) => (
+            <button
+              key={role.id}
+              type="button"
+              onClick={() => onChange(selectedRoleIds.filter((roleId) => roleId !== role.id))}
+              className="rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium"
+              title="Remove role"
+            >
+              {formatRoleName(role.name)} ×
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="mb-3 text-xs text-muted-foreground">No role selected.</p>
+      )}
+
+      {!compact ? (
+        <SelectField
+          label="Role template"
+          value={mode}
+          onChange={(event) => {
+            const value = event.target.value;
+            setMode(value);
+            if (value && value !== "custom") {
+              onChange([value]);
+            }
+          }}
+        >
+          <option value="">Select a template</option>
+          {templates.map((template) => (
+            <option key={template.id} value={template.id}>
+              {template.label}
+            </option>
+          ))}
+          <option value="custom">Custom...</option>
+        </SelectField>
+      ) : null}
+
+      {mode === "custom" ? (
+        <div className="mt-3 max-h-56 space-y-2 overflow-auto rounded-md border border-slate-200 p-3">
+          {roles.map((role) => {
+            const checked = selectedRoleIds.includes(role.id);
+            return (
+              <label key={role.id} className="flex items-start gap-2 text-sm">
+                <input
+                  className="mt-1"
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(event) => {
+                    if (event.target.checked) {
+                      onChange([...selectedRoleIds, role.id]);
+                    } else {
+                      onChange(selectedRoleIds.filter((roleId) => roleId !== role.id));
+                    }
+                  }}
+                />
+                <span>
+                  <span className="block font-medium text-slate-800">{formatRoleName(role.name)}</span>
+                  <span className="block text-xs text-slate-500">{role.description ?? `${role.permissions.length} permissions`}</span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function roleTemplates(roles: Role[]) {
+  const preferred = [
+    "PLATFORM_ADMINISTRATOR",
+    "PLATFORM_ADMIN",
+    "RELATIONSHIP_ORIGINATION_MANAGER",
+    "RELATIONSHIP_MANAGER",
+    "COMPLIANCE_KYC_OFFICER",
+    "COMPLIANCE_OFFICER",
+    "CREDIT_RISK_OFFICER",
+    "OPERATIONS_ANALYST",
+    "FINANCE_TREASURY",
+    "FUND_INVESTOR_MANAGER",
+    "ANCHOR_BUYER_USER",
+    "ANCHOR_USER",
+    "SUPPLIER_USER",
+    "FUNDER_USER",
+    "AUDITOR_REGULATOR_READ_ONLY",
+    "AUDITOR_READ_ONLY",
+  ];
+  const byName = new Map(roles.map((role) => [role.name, role]));
+  const ordered = preferred
+    .map((name) => byName.get(name))
+    .filter((role): role is Role => Boolean(role));
+  const extras = roles.filter((role) => !preferred.includes(role.name));
+  return [...ordered, ...extras].map((role) => ({
+    id: role.id,
+    label: formatRoleName(role.name),
+  }));
+}
+
+function formatRoleName(name: string) {
+  return name
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function EditableUserRow({
@@ -3064,7 +3182,12 @@ function EditableUserRow({
           </div>
         </PermissionGate>
       </div>
-      <RoleCheckboxes roles={roles} selectedRoleIds={roleIds} onChange={setRoleIds} />
+      <RoleTemplatePicker
+        roles={roles}
+        selectedRoleIds={roleIds}
+        onChange={setRoleIds}
+        compact
+      />
       {update.isError ? <ErrorText error={update.error} /> : null}
     </div>
   );

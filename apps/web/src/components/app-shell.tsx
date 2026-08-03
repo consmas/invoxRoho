@@ -17,7 +17,6 @@ import {
   CreditCard,
   FileText,
   FileUp,
-  Gauge,
   Landmark,
   LayoutDashboard,
   ListChecks,
@@ -33,6 +32,7 @@ import {
   Users,
   Webhook,
   Workflow,
+  X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
@@ -471,14 +471,14 @@ export function PageHeader({
   description?: string;
   action?: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const crumbs = breadcrumbFromPath(pathname, title);
+
   return (
     <div className="mb-6 border-b border-border pb-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            <Gauge className="size-3.5" />
-            <span>Workspace</span>
-          </div>
+          <Breadcrumb items={crumbs} />
           <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
             {title}
           </h1>
@@ -491,6 +491,32 @@ export function PageHeader({
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>
     </div>
+  );
+}
+
+export interface Crumb {
+  label: string;
+  href?: string;
+}
+
+export function Breadcrumb({ items }: { items: Crumb[] }) {
+  return (
+    <nav className="mb-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+      {items.map((item, index) => (
+        <span key={`${item.label}-${index}`} className="flex items-center gap-1.5">
+          {index > 0 ? <ChevronRight className="size-3 text-muted-foreground" /> : null}
+          {item.href ? (
+            <Link href={item.href} className="hover:text-foreground">
+              {item.label}
+            </Link>
+          ) : (
+            <span className={index === items.length - 1 ? "font-semibold text-foreground" : ""}>
+              {item.label}
+            </span>
+          )}
+        </span>
+      ))}
+    </nav>
   );
 }
 
@@ -528,13 +554,14 @@ export function Button({
   variant = "primary",
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "danger";
+  variant?: "primary" | "secondary" | "danger" | "brass";
 }) {
   const styles = {
     primary: "bg-primary text-primary-foreground hover:bg-primary/90",
     secondary:
       "border border-border bg-card text-card-foreground hover:bg-muted",
     danger: "bg-destructive text-white hover:bg-destructive/90",
+    brass: "bg-brass-600 text-white hover:bg-brass-600/90",
   };
   return (
     <button
@@ -545,6 +572,172 @@ export function Button({
     >
       {children}
     </button>
+  );
+}
+
+export interface EntityOption {
+  id: string;
+  label: string;
+  sublabel?: string;
+  type: string;
+}
+
+export function EntityPicker({
+  options,
+  value,
+  onChange,
+  placeholder = "Search counterparties, invoices, programmes...",
+}: {
+  options: EntityOption[];
+  value: EntityOption | null;
+  onChange: (option: EntityOption | null) => void;
+  placeholder?: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const filtered =
+    query.length === 0
+      ? []
+      : options
+          .filter((option) =>
+            [option.label, option.sublabel, option.id, option.type]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase()
+              .includes(query.toLowerCase()),
+          )
+          .slice(0, 8);
+  const grouped = filtered.reduce<Record<string, EntityOption[]>>(
+    (accumulator, option) => {
+      (accumulator[option.type] ??= []).push(option);
+      return accumulator;
+    },
+    {},
+  );
+
+  if (value) {
+    return (
+      <div className="inline-flex max-w-full items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-sm">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          {value.type}
+        </span>
+        <span className="min-w-0 truncate font-semibold text-foreground">
+          {value.label}
+        </span>
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          className="text-muted-foreground hover:text-foreground"
+          aria-label="Clear selected entity"
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+        <input
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder}
+          className={`${inputClass} pl-8`}
+        />
+      </div>
+      {open && filtered.length > 0 ? (
+        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-border bg-card py-1 shadow-lg">
+          {Object.entries(grouped).map(([type, items]) => (
+            <div key={type}>
+              <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {type}
+              </div>
+              {items.map((option) => (
+                <button
+                  key={`${option.type}-${option.id}`}
+                  type="button"
+                  onClick={() => {
+                    onChange(option);
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                  className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                >
+                  <div className="font-medium text-foreground">{option.label}</div>
+                  {option.sublabel ? (
+                    <div className="text-xs text-muted-foreground">
+                      {option.sublabel}
+                    </div>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function ConfirmDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  tone = "default",
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  tone?: "default" | "destructive" | "brass";
+  onConfirm: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+      <div className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-xl">
+        <div className="mb-3 flex items-center gap-3">
+          <div
+            className={`flex size-9 items-center justify-center rounded-full ${
+              tone === "destructive"
+                ? "bg-red-50 text-destructive"
+                : "bg-brass-100 text-brass-600"
+            }`}
+          >
+            <AlertTriangle className="size-4" />
+          </div>
+          <h2 className="text-lg font-semibold">{title}</h2>
+        </div>
+        <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+        <div className="mt-5 flex justify-end gap-3">
+          <Button variant="secondary" onClick={() => onOpenChange(false)}>
+            {cancelLabel}
+          </Button>
+          <Button
+            variant={tone === "brass" ? "brass" : tone === "destructive" ? "danger" : "primary"}
+            onClick={() => {
+              onConfirm();
+              onOpenChange(false);
+            }}
+          >
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -811,4 +1004,29 @@ function titleCase(value: string) {
     .replace(/_/g, " ")
     .toLowerCase()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function breadcrumbFromPath(pathname: string, title: string): Crumb[] {
+  const parts = pathname.split("/").filter(Boolean);
+  if (parts.length === 0) return [{ label: "Dashboard", href: "/dashboard" }];
+  const crumbs: Crumb[] = [];
+  parts.forEach((part, index) => {
+    const href = `/${parts.slice(0, index + 1).join("/")}`;
+    const isLast = index === parts.length - 1;
+    const label =
+      isLast && !isOpaqueId(part) ? title : isOpaqueId(part) ? shortId(part) : titleCase(part);
+    crumbs.push({
+      label,
+      href: isLast ? undefined : href,
+    });
+  });
+  return crumbs;
+}
+
+function isOpaqueId(value: string) {
+  return value.length > 16 || /^[0-9a-f-]{12,}$/i.test(value);
+}
+
+function shortId(value: string) {
+  return value.length > 12 ? `${value.slice(0, 8)}...` : value;
 }
