@@ -16,7 +16,7 @@ import { PERMISSIONS } from '../auth/permissions';
 import { Phase2RecordDto } from './dto/phase2-record.dto';
 import { Phase2ProductsService } from './phase2-products.service';
 
-@Controller('phase2-products')
+@Controller(['phase2-products', 'products'])
 export class Phase2ProductsController {
   constructor(private readonly phase2: Phase2ProductsService) {}
 

@@ -68,6 +68,12 @@ const navGroups: { label: string; eyebrow: string; items: NavItem[] }[] = [
         permission: PERMISSIONS.counterpartyRead,
       },
       {
+        label: "Onboarding & KYC",
+        href: "/onboarding",
+        icon: Building2,
+        permission: PERMISSIONS.counterpartyCreate,
+      },
+      {
         label: "Programmes",
         href: "/programmes",
         icon: Workflow,
@@ -112,6 +118,48 @@ const navGroups: { label: string; eyebrow: string; items: NavItem[] }[] = [
     ],
   },
   {
+    label: "Products",
+    eyebrow: "Funding lines",
+    items: [
+      {
+        label: "Dynamic Discounting",
+        href: "/dynamic-discounting",
+        icon: CircleDollarSign,
+        permission: PERMISSIONS.productConfigure,
+      },
+      {
+        label: "Receivables",
+        href: "/receivables",
+        icon: Banknote,
+        permission: PERMISSIONS.productConfigure,
+      },
+      {
+        label: "Funder Marketplace",
+        href: "/marketplace",
+        icon: Scale,
+        permission: PERMISSIONS.fundingRead,
+      },
+      {
+        label: "ESG Scorecards",
+        href: "/esg",
+        icon: ShieldCheck,
+        permission: PERMISSIONS.productConfigure,
+      },
+      {
+        label: "Anomaly Signals",
+        href: "/anomalies",
+        icon: AlertTriangle,
+        permission: PERMISSIONS.creditRead,
+      },
+      {
+        label: "Investor Reports",
+        href: "/investor-reports",
+        icon: BarChart3,
+        permission: PERMISSIONS.investorRead,
+      },
+    ],
+  },
+  {
     label: "Control",
     eyebrow: "Risk and integrity",
     items: [
@@ -140,6 +188,12 @@ const navGroups: { label: string; eyebrow: string; items: NavItem[] }[] = [
         permission: PERMISSIONS.workflowReadV2,
       },
       {
+        label: "Bulk Operations",
+        href: "/bulk-operations",
+        icon: ListChecks,
+        permission: PERMISSIONS.reportRead,
+      },
+      {
         label: "Documents",
         href: "/documents",
         icon: FileText,
@@ -157,6 +211,12 @@ const navGroups: { label: string; eyebrow: string; items: NavItem[] }[] = [
         icon: BarChart3,
         permission: PERMISSIONS.reportRead,
       },
+      {
+        label: "Scheduled Reports",
+        href: "/scheduled-reports",
+        icon: FileText,
+        permission: PERMISSIONS.reportSchedule,
+      },
     ],
   },
   {
@@ -170,16 +230,34 @@ const navGroups: { label: string; eyebrow: string; items: NavItem[] }[] = [
         permission: PERMISSIONS.notificationsRead,
       },
       {
+        label: "Notification Settings",
+        href: "/notification-settings",
+        icon: Bell,
+        permission: PERMISSIONS.notificationsRead,
+      },
+      {
         label: "Integrations",
         href: "/integrations/connections",
         icon: Plug,
         permission: PERMISSIONS.integrationsRead,
       },
       {
+        label: "Developer API",
+        href: "/api-docs",
+        icon: Plug,
+        permission: PERMISSIONS.integrationRead,
+      },
+      {
         label: "Webhooks",
         href: "/webhooks/endpoints",
         icon: Webhook,
         permission: PERMISSIONS.webhooksRead,
+      },
+      {
+        label: "Rates & FX",
+        href: "/rates",
+        icon: ReceiptText,
+        permission: PERMISSIONS.rateRead,
       },
       {
         label: "Users & Roles",

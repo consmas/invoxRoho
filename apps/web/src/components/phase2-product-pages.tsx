@@ -64,7 +64,7 @@ const configs: ResourceConfig[] = [
     resource: "dynamic-discounting-offers",
     title: "Dynamic Discounting",
     description: "Buyer-funded early-payment offers with yield, cash availability and discount modelling.",
-    path: "/phase2/dynamic-discounting",
+    path: "/dynamic-discounting",
     createLabel: "Create offer",
     defaults: {
       programmeId: "",
@@ -119,7 +119,7 @@ const configs: ResourceConfig[] = [
     resource: "receivables-facilities",
     title: "Receivables Facilities",
     description: "Supplier-led receivables finance, factoring and invoice-discounting facility records.",
-    path: "/phase2/receivables",
+    path: "/receivables",
     createLabel: "Create facility",
     defaults: {
       programmeId: "",
@@ -169,7 +169,7 @@ const configs: ResourceConfig[] = [
     resource: "funder-marketplace-bids",
     title: "Funder Marketplace",
     description: "Funder appetite, participation bids, tenor constraints and yield conditions.",
-    path: "/phase2/marketplace-bids",
+    path: "/marketplace",
     createLabel: "Create bid",
     defaults: {
       financingTransactionId: "",
@@ -213,7 +213,7 @@ const configs: ResourceConfig[] = [
     resource: "esg-scorecards",
     title: "ESG Scorecards",
     description: "Supplier or programme ESG scoring with KPI evidence and pricing adjustments.",
-    path: "/phase2/esg",
+    path: "/esg",
     createLabel: "Create scorecard",
     defaults: {
       counterpartyId: "",
@@ -253,7 +253,7 @@ const configs: ResourceConfig[] = [
     resource: "ai-anomaly-signals",
     title: "Anomaly Signals",
     description: "AI/rules anomaly review queue for invoice, payment and counterparty signals.",
-    path: "/phase2/anomalies",
+    path: "/anomalies",
     createLabel: "Create signal",
     defaults: {
       invoiceId: "",
@@ -297,7 +297,7 @@ const configs: ResourceConfig[] = [
     resource: "investor-report-snapshots",
     title: "Investor Reports",
     description: "SCF fund reporting snapshots covering NAV, commitments, drawdowns, distributions and yield.",
-    path: "/phase2/investor-reports",
+    path: "/investor-reports",
     createLabel: "Create snapshot",
     defaults: {
       investorRecordId: "",
